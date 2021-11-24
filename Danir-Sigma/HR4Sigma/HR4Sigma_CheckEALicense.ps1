@@ -7,22 +7,16 @@ function Check-EALicense {
     
 
     switch ($License) {
-        'E3' { 
-                $EAGroupName = "SG_Office365-E3_Nexer_EA"
-                $CSPGroupName = "SG_Microsoft365-E3_Nexer_CSP"
-                [int32]$MaxUsers = 1472
-            }
-        
-        'F3' {
-                $EAGroupName = "SG_Office365-F3_Nexer_EA"
-                $CSPGroupName = "SG_Microsoft365-F3_Nexer_CSP"
-                [int32]$MaxUsers = 525
-            }
+        'E3' { [int32]$MaxUsers = 1472 }
+        'F3' { [int32]$MaxUsers = 525 }
     }
+    
+    $EAGroupName = "SG_Office365-${License}_Nexer-EA"
+    $CSPGroupName = "SG_Microsoft365-${License}_Nexer-CSP"
 
-    $EAGroupMembers = Get-ADGroupMembers -Identity $EAGroupName -Recursive
+    $EAGroupMembersCount = (Get-ADGroupMember -Identity $EAGroupName -Recursive).Count
 
-    if ($EAGroupMembers.Count -lt $MaxUsers) {
+    if ($EAGroupMembersCount -lt $MaxUsers) {
         $AddGroup = $EAGroupName
     }else {
         $AddGroup = $CSPGroupName
