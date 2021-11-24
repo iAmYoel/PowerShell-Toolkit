@@ -2,11 +2,7 @@ function Check-EALicense {
     param (
         [Parameter(Mandatory)]
         [ValidateSet("E3","F3")]
-        [String]$License,
-
-        [Parameter(Mandatory)]
-        #[ValidateScript({($_ -match '@sigma.se$')})]
-        [String]$SamAccountName
+        [String]$License
     )
     
 
@@ -24,7 +20,7 @@ function Check-EALicense {
             }
     }
 
-    $EAGroupMembers = Get-ADGroupMembers -Identity $EAGroupName
+    $EAGroupMembers = Get-ADGroupMembers -Identity $EAGroupName -Recursive
 
     if ($EAGroupMembers.Count -lt $MaxUsers) {
         $AddGroup = $EAGroupName
@@ -32,5 +28,5 @@ function Check-EALicense {
         $AddGroup = $CSPGroupName
     }
 
-    Add-ADGroupMember -Identity $AddGroup -Members $SamAccountName
+    Return $AddGroup
 }
