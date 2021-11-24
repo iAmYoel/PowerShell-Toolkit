@@ -84,22 +84,16 @@ param
         
     
         switch ($License) {
-            'E3' { 
-                    $EAGroupName = "SG_Office365-E3_Nexer_EA"
-                    $CSPGroupName = "SG_Microsoft365-E3_Nexer_CSP"
-                    [int32]$MaxUsers = 1472
-                }
-            
-            'F3' {
-                    $EAGroupName = "SG_Office365-F3_Nexer_EA"
-                    $CSPGroupName = "SG_Microsoft365-F3_Nexer_CSP"
-                    [int32]$MaxUsers = 525
-                }
+            'E3' { [int32]$MaxUsers = 1472 }
+            'F3' { [int32]$MaxUsers = 525 }
         }
+        
+        $EAGroupName = "SG_Office365-${License}_Nexer-EA"
+        $CSPGroupName = "SG_Microsoft365-${License}_Nexer-CSP"
+
+        $EAGroupMembersCount = (Get-ADGroupMember -Identity $EAGroupName -Recursive).Count
     
-        $EAGroupMembers = Get-ADGroupMembers -Identity $EAGroupName -Recursive
-    
-        if ($EAGroupMembers.Count -lt $MaxUsers) {
+        if ($EAGroupMembersCount -lt $MaxUsers) {
             $AddGroup = $EAGroupName
         }else {
             $AddGroup = $CSPGroupName
@@ -672,7 +666,7 @@ DATABASE: $database
         if($o365)
         {
             # Remove old license groups
-            $o365member = Get-ADPrincipalGroupMembership $alias | Where {($_.Name -match "^SG_(Microsoft|Office)365-(F|E)\d_(Nexer|Sigma)-(CSP|EA)$")}
+            $o365member = Get-ADPrincipalGroupMembership $alias | Where {($_.Name -match "^SG_(Microsoft|Office)365-(F|E)\d_(Nexer|Sigma)-(CSP|EA)$") -OR ($_.Name -match "^SG\sOffice365\s(F|E)\d$")}
             IF($o365member)
             {
                 foreach ($item in $o365member)
