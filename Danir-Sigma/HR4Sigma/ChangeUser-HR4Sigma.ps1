@@ -651,7 +651,7 @@ DATABASE: $database
                 "UK"            {}
             }
         }
-        elseif (($company -like "Sigma*")) 
+        elseif (($company -like "Danir AB") -OR ($company -like "Sigma*")) 
         {
             $o365group = switch ($o365) {
                 "E1"            { "SG_Office365-E1_Sigma-CSP" }
