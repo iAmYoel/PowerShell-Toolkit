@@ -82,6 +82,33 @@ param
 
 # Load functions
 
+    function Check-EALicense {
+        param (
+            [Parameter(Mandatory)]
+            [ValidateSet("E3","F3")]
+            [String]$License
+        )
+        
+
+        switch ($License) {
+            'E3' { [int32]$MaxUsers = 1472 }
+            'F3' { [int32]$MaxUsers = 525 }
+        }
+        
+        $EAGroupName = "SG_Office365-${License}_Nexer-EA"
+        $CSPGroupName = "SG_Microsoft365-${License}_Nexer-CSP"
+
+        $EAGroupMembersCount = (Get-ADGroupMember -Identity $EAGroupName -Recursive).Count
+
+        if ($EAGroupMembersCount -lt $MaxUsers) {
+            $AddGroup = $EAGroupName
+        }else {
+            $AddGroup = $CSPGroupName
+        }
+
+        Return $AddGroup
+    }
+
     function check-values
     {
     if ([string]::IsNullOrWhiteSpace($alias))
@@ -669,10 +696,10 @@ DATABASE: $database
             "Sigma Industry East North AB"          { "Industry East North Office $city" }
             "Sigma Industry Evolution AB"           { "Industry Evolution Office $city" }
            #"Sigma Industry Inc."                   { "SII Office $city" }
-            "Sigma Industry Solutions AB"            { "Industry Solutions Office $city" }
-            "Sigma Industry South AB"                { "Industry South Office $city" }
-            "Sigma Industry West AB"                 { "Industry West Office $city" }
-            "Sigma Quality & Compliance AB"          {
+            "Sigma Industry Solutions AB"           { "Industry Solutions Office $city" }
+            "Sigma Industry South AB"               { "Industry South Office $city" }
+            "Sigma Industry West AB"                { "Industry West Office $city" }
+            "Sigma Quality & Compliance AB"         {
                                                         if($city -like "Göteborg")
                                                             { "QC Office Gothenburg" }
                                                         else
