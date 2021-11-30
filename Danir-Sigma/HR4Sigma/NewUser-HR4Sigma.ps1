@@ -618,234 +618,96 @@ DATABASE: $database
 
     function set-account-memberof
     {
-            if($company -eq "Danir AB")
-            {
-                Get-ADGroup -Identity "Danir Office $city" | Add-ADGroupMember -Members $alias
-            }
+        $AddGroups = @()
+        $AddGroups += switch ($company) {
+            "Danir AB"                              { "Danir Office $city" }
+            "Nexer AB"                              { "ITC Office $city" }
+           #"Nexer Asset Management AS"             {}
+            "Nexer Asset Management Oy"             { "ITC Finland Office $city" }
+            "Nexer Cybersecurity AB"                { "Cybersecurity Office $city" }
+            "Sigma Cybersecurity AB"                { "Cybersecurity Office $city" }
+            "Nexer Digital Ltd"                     { "ITC UK Office $city" }
+            "Nexer Enterprise Applications AB"      { "Dynamics Office $city" }
+            "Nexer Enterprise Applications Inc"     { "Enterprise Applications Inc Office $city" }
+            "Nexer Enterprise Applications Ltd"     { "Enterprise Applications Ltd Office $city" }
+            "Nexer Enterprise Applications Prv Ltd" { "ITC India Enterprise Applications Office $city" }
+            "Nexer Infrastructure AB"               { "IT Tech Office $city" }
+            "Nexer Insight AB"                      { "IoT AI Office $city" }
+            "Nexer Insight Inc"                     { "ITC Office $city" }
+            "Nexer Insight Ltd"                     { "ITC Insight Ltd Office $city" }
+            "Nexer Insight Sp. z o.o."              { "ITC Insight Poland Office $city" }
+            "Nexer IT Services AB"                  { "NITS Office $city" }
+            "Nexer Prv Ltd"                         { "ITC Office $city" }
+            "Nexer Recruit AB"                      { "Recruit Office $city" }
+            "Nexer Sp. z o.o."                      { "ITC Office $city" }
+            "Sigma IT Polska Sp. z o.o."            { "ITC Office $city" }
+            "Nexer Tech Talent AB"                  { "Young Talent Office $city" }
+            "Sigma Civil AB"                        {
+                                                        if($city -like "Stockholm")
+                                                            { "Civil Office Stockholm Liljeholmen" }
+                                                        else
+                                                            { "Civil Office $city" }
 
-            elseif($company -eq "Nexer AB")
-            {
-                Get-ADGroup -Identity "ITC Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            #elseif($company -eq "Nexer Asset Management AS")
-            #{}
-
-            elseif($company -eq "Nexer Asset Management Oy")
-            {
-                Get-ADGroup -Identity "ITC Finland Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Cybersecurity AB")
-            {
-                Get-ADGroup -Identity "Cybersecurity Office $city" | Add-ADGroupMember -Members $alias
-            }
-            elseif($company -eq "Sigma Cybersecurity AB")
-            {
-                Get-ADGroup -Identity "Cybersecurity Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Digital Ltd")
-            {
-                Get-ADGroup -Identity "ITC UK Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Enterprise Applications AB")
-            {
-                Get-ADGroup -Identity "Dynamics Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Enterprise Applications Inc")
-            {
-                Get-ADGroup -Identity "Enterprise Applications Inc Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Enterprise Applications Ltd")
-            {
-                Get-ADGroup -Identity "Enterprise Applications Ltd Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Enterprise Applications Prv Ltd")
-            {
-                Get-ADGroup -Identity "ITC India Enterprise Applications Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Infrastructure AB")
-            {
-                Get-ADGroup -Identity "IT Tech Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Insight AB")
-            {
-                Get-ADGroup -Identity "IoT AI Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Insight Inc")
-            {
-                Get-ADGroup -Identity "ITC Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Insight Ltd")
-            {
-                Get-ADGroup -Identity "ITC Insight Ltd Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Insight Sp. z o.o.")
-            {
-                Get-ADGroup -Identity "ITC Insight Poland Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer IT Services AB")
-            {
-                Get-ADGroup -Identity "NITS Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Prv Ltd")
-            {
-                Get-ADGroup -Identity "ITC Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Recruit AB")
-            {
-                Get-ADGroup -Identity "Recruit Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Sp. z o.o.")
-            {
-                Get-ADGroup -Identity "ITC Office $city" | Add-ADGroupMember -Members $alias
-            }
-            elseif($company -eq "Sigma IT Polska Sp. z o.o.")
-            {
-                Get-ADGroup -Identity "ITC Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Nexer Tech Talent AB")
-            {
-                Get-ADGroup -Identity "Young Talent Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-
-            elseif($company -eq "Sigma Civil AB")
-            {
-                if($city -eq "Stockholm")
-                    {Get-ADGroup -Identity "Civil Office Stockholm Liljeholmen" | Add-ADGroupMember -Members $alias}
-                else
-                    {Get-ADGroup -Identity "Civil Office $city" | Add-ADGroupMember -Members $alias}
-                
-                foreach ($cg in $sgcivilgroup)
-                {
-                    Get-ADUser -Identity $alias | Add-ADPrincipalGroupMembership -memberof $cg
-                }
-            }
-
-            elseif($company -eq "Sigma Connectivity AB")
-            {
-                Get-ADGroup -Identity "og-ConnectivityAll" | Add-ADGroupMember -Members $alias
-                Get-ADGroup -Identity "Connectivity SWE Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Sigma Connectivity ApS")
-            {
-                Get-ADGroup -Identity "og-ConnectivityAll" | Add-ADGroupMember -Members $alias
-                if($city -eq "Köpenhamn")
-                    {Get-ADGroup -Identity "Connectivity DK Office Copenhagen" | Add-ADGroupMember -Members $alias}
-                else
-                    {Get-ADGroup -Identity "Connectivity DK Office $city" | Add-ADGroupMember -Members $alias}
-            }
-
-            elseif($company -eq "Sigma Connectivity Inc.")
-            {
-                Get-ADGroup -Identity "og-ConnectivityAll" | Add-ADGroupMember -Members $alias
-                Get-ADGroup -Identity "Connectivity INC Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Sigma Connectivity Sp. z o.o.")
-            {
-                Get-ADGroup -Identity "og-ConnectivityAll" | Add-ADGroupMember -Members $alias
-                Get-ADGroup -Identity "Connectivity PL Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Sigma Connectivity Engineering AB")
-            {
-                Get-ADGroup -Identity "og-ConnectivityAll" | Add-ADGroupMember -Members $alias
-                Get-ADGroup -Identity "SC Engineering Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Sigma Embedded Engineering AB")
-            {
-                Get-ADGroup -Identity "Embedded Engineering Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Sigma Energy & Marine AB")
-            {
-                Get-ADGroup -Identity "Energy Marine Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Sigma Energy & Marine AS")
-            {
-                Get-ADGroup -Identity "Energy Marine AS Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Sigma Industry East North AB")
-            {
-                Get-ADGroup -Identity "Industry East North Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Sigma Industry Evolution AB")
-            {
-                Get-ADGroup -Identity "Industry Evolution Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            #elseif($company -eq "Sigma Industry Inc.")
-            <#{
-                Get-ADGroup -Identity "SII Office $city" | Add-ADGroupMember -Members $alias
-            }#>
-
-            elseif($company -eq "Sigma Industry Solutions AB")
-            {
-                Get-ADGroup -Identity "Industry Solutions Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Sigma Industry South AB")
-            {
-                Get-ADGroup -Identity "Industry South Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Sigma Industry West AB")
-            {
-                Get-ADGroup -Identity "Industry West Office $city" | Add-ADGroupMember -Members $alias
-            }
-
-            elseif($company -eq "Sigma Quality & Compliance AB" -or $company -eq "Sigma Quality & Compliance ApS")
-            {
-                if($city -eq "Göteborg")
-                    {Get-ADGroup -Identity "QC Office Gothenburg" | Add-ADGroupMember -Members $alias}
-                else
-                    {Get-ADGroup -Identity "QC Office $city" | Add-ADGroupMember -Members $alias}
-            }
-
-            elseif($company -eq "aptio group Sweden AB" -or $company -eq "aptio group Denmark ApS")
-            {
-                if($city -eq "Göteborg")
-                    {Get-ADGroup -Identity "QC Office Gothenburg" | Add-ADGroupMember -Members $alias}
-                else
-                    {Get-ADGroup -Identity "QC Office $city" | Add-ADGroupMember -Members $alias}
-            }
-
-            #elseif($company -eq "Sigma Software LLC")
-            #{}
-
-            else
-            {
-                Get-ADGroup -Identity "Office $city All" | Add-ADGroupMember -Members $alias        
-            }
+                                                        foreach ($cg in $sgcivilgroup)
+                                                        {
+                                                            Get-ADUser -Identity $alias | Add-ADPrincipalGroupMembership -memberof $cg
+                                                        }
+                                                    }
+            "Sigma Connectivity AB"                 { @("og-ConnectivityAll","Connectivity SWE Office $city") }
+            "Sigma Connectivity ApS"                {
+                                                        if($city -like "Köpenhamn")
+                                                            { @("og-ConnectivityAll","Connectivity DK Office Copenhagen") }
+                                                        else
+                                                            { @("og-ConnectivityAll","Connectivity DK Office $city") }
+                                                    }
+            "Sigma Connectivity Inc."               { @("og-ConnectivityAll","Connectivity INC Office $city") }
+            "Sigma Connectivity Sp. z o.o."         { @("og-ConnectivityAll","Connectivity PL Office $city") }
+            "Sigma Connectivity Engineering AB"     { @("og-ConnectivityAll","SC Engineering Office $city") }
+            "Sigma Embedded Engineering AB"         { "Embedded Engineering Office $city" }
+            "Sigma Energy & Marine AB"              { "Energy Marine Office $city" }
+            "Sigma Energy & Marine AS"              { "Energy Marine AS Office $city" }
+            "Sigma Industry East North AB"          { "Industry East North Office $city" }
+            "Sigma Industry Evolution AB"           { "Industry Evolution Office $city" }
+           #"Sigma Industry Inc."                   { "SII Office $city" }
+            "Sigma Industry Solutions AB"            { "Industry Solutions Office $city" }
+            "Sigma Industry South AB"                { "Industry South Office $city" }
+            "Sigma Industry West AB"                 { "Industry West Office $city" }
+            "Sigma Quality & Compliance AB"          {
+                                                        if($city -like "Göteborg")
+                                                            { "QC Office Gothenburg" }
+                                                        else
+                                                            { "QC Office $city" }
+                                                    }
+            "Sigma Quality & Compliance ApS"        {
+                                                        if($city -like "Göteborg")
+                                                            { "QC Office Gothenburg" }
+                                                        else
+                                                            { "QC Office $city" }
+                                                    }
+            "aptio group Sweden AB"                 {
+                                                        if($city -eq "Göteborg")
+                                                            { "QC Office Gothenburg" }
+                                                        else
+                                                            { "QC Office $city" }
+                                                    }
+            "aptio group Denmark ApS"               {
+                                                        if($city -eq "Göteborg")
+                                                            { "QC Office Gothenburg" }
+                                                        else
+                                                            { "QC Office $city" }
+                                                    }
+           #"Sigma Software LLC"                    {}
+            Default                                 { "Office $city All" }
+        }
+        
+        # SG Groups
+        if($sggroup -notlike "N/A")
+        {
+            $AddGroups += $sggroup
+        }
 
         # DG Groups
-        if($dggroup -eq "N/A")
-        {
-            #return
-        }
-        else
+        if($dggroup -notlike "N/A")
         {
             foreach ($g in $dggroup)
             {
@@ -853,32 +715,36 @@ DATABASE: $database
             }
         }
         
-        # SG Groups
-        if($sggroup -eq "N/A")
-        {
-            #return
-        }
-        else
-        {
-            Get-ADGroup -Identity $sggroup | Add-ADGroupMember -Members $alias
-        }
-        
         # Office365
-        if($o365 -eq "E1")
+        IF(($company -like "Nexer*") -OR ($company -like "Sigma IT Polska Sp. z o.o."))
         {
-            Get-ADGroup -Identity "SG Office365 E1" | Add-ADGroupMember -Members $alias
+            $o365group = switch ($o365) {
+                "E1"            { "SG_Office365-E1_Nexer-CSP" }
+                "E3"            { Check-EALicense -License "E3" }
+                "F3"            { Check-EALicense -License "F3" }
+                "Ingen licens"  {}
+                "Underkonsult"  {}
+                "UK"            {}
+            }
         }
-        if($o365 -eq "E3")
+        elseif (($company -like "Danir AB") -OR ($company -like "Sigma*") -OR ($company -like "aptio*")) 
         {
-            Get-ADGroup -Identity "SG Office365 E3" | Add-ADGroupMember -Members $alias
+            $o365group = switch ($o365) {
+                "E1"            { "SG_Office365-E1_Sigma-CSP" }
+                "E3"            { "SG_Microsoft365-E3_Sigma-CSP" }
+                "F3"            { "SG_Microsoft365-F3_Sigma-CSP" }
+                "Ingen licens"  {}
+                "Underkonsult"  {}
+                "UK"            {}
+            }
         }
-        if($o365 -eq "F1")
+        # If license value passed from HR4Sigma
+        if($o365)
         {
-            Get-ADGroup -Identity "SG Office365 F1" | Add-ADGroupMember -Members $alias
-        }
-        if($o365 -eq "Ingen licens" -or $o365 -eq "Underkonsult" -or $o365 -eq "" -or $o365 -eq $null)
-        {
-            #return
+            # Add new license groups (If assigned)
+            if ($o365group) {
+                $AddGroups += $o365group
+            }
         }
 
         # No Group
@@ -888,6 +754,17 @@ DATABASE: $database
         #}
     }
 
+
+    # Assign All Groups
+    foreach ($item in $AddGroups)
+    {
+        Get-ADGroup -Identity $item | Add-ADGroupMember -Members $alias
+    }
+
+
+
+
+    
     function sms-and-mail
     {
     
