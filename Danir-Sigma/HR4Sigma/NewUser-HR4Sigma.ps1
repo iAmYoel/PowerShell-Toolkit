@@ -747,8 +747,9 @@ DATABASE: $database
         {
             $o365group = switch ($o365) {
                 "E1"            { "SG_Office365-E1_Nexer-CSP" }
-                "E3"            { Check-EALicense -License "E3" }
+                "F1"            { Check-EALicense -License "F3" }
                 "F3"            { Check-EALicense -License "F3" }
+                "E3"            { Check-EALicense -License "E3" }
                 "Ingen licens"  {}
                 "Underkonsult"  {}
                 "UK"            {}
@@ -758,8 +759,9 @@ DATABASE: $database
         {
             $o365group = switch ($o365) {
                 "E1"            { "SG_Office365-E1_Sigma-CSP" }
-                "E3"            { "SG_Microsoft365-E3_Sigma-CSP" }
+                "F1"            { "SG_Microsoft365-F3_Sigma-CSP" }
                 "F3"            { "SG_Microsoft365-F3_Sigma-CSP" }
+                "E3"            { "SG_Microsoft365-E3_Sigma-CSP" }
                 "Ingen licens"  {}
                 "Underkonsult"  {}
                 "UK"            {}
@@ -779,13 +781,13 @@ DATABASE: $database
         #{
         #    Get-ADGroup -Identity "No Group" | Remove-ADGroupMember -Members $Alias -Confirm:$false
         #}
-    }
-
-
-    # Assign All Groups
-    foreach ($item in $AddGroups)
-    {
-        Get-ADGroup -Identity $item | Add-ADGroupMember -Members $alias
+    
+        # Assign All Groups
+        foreach ($item in $AddGroups)
+        {
+            Get-ADGroup -Identity $item | Add-ADGroupMember -Members $alias
+        }
+    
     }
 
 
@@ -1104,7 +1106,11 @@ create-account-ad-exchangeonline
 Start-Sleep -Seconds 10 # För att den ska få tid att skapa upp konto innan info sätts
 
 set-account-info
-set-account-memberof
+
+if ($company -notlike "Nexer IT Services AB") {
+    set-account-memberof
+}
+
 set-account-expire
 
 create-px
