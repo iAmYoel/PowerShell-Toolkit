@@ -136,6 +136,11 @@ $ErrorActionPreference = "Continue"
 
 
 
+# Remove logs and reports older than 90 days
+Get-ChildItem –Path $LogFolderPath -Recurse | Where-Object {($_.LastWriteTime -lt (Get-Date).AddDays(-90))} | Remove-Item -Force
+Get-ChildItem –Path $CSPReportFolderPath -Recurse | Where-Object {($_.LastWriteTime -lt (Get-Date).AddDays(-90))} | Remove-Item -Force
+
+
 
 #region functions
 
@@ -151,7 +156,7 @@ function Write-LogEntry {
         [string]$Severity = "INFO",
 
         [parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
-        [string]$LogPath = (Join-Path -Path $LogFolderPath -ChildPath "AutoUpdateCSPLicenses_$date.Log")
+        [string]$LogPath = (Join-Path -Path $LogFolderPath -ChildPath "CSPLicenseUpdater_$date.Log")
     )
 
     # Test log file location
