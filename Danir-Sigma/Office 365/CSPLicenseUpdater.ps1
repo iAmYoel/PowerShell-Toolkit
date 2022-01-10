@@ -15,8 +15,9 @@
 
 .NOTES
     FileName:           AutoUpdateCSPLicenses.ps1
-    Author:             Yoel Abraham, Magnus Schöllin (API)
-    Contact:            Yoel.Abraham@rts.se, Magnus.Schollin@rts.se
+    Author:             Yoel Abraham
+    Contributors:       Magnus Schöllin (API)
+    Contact:            Yoel.Abraham@rts.se
     Created:            2021-12-20
 
     Version history:
