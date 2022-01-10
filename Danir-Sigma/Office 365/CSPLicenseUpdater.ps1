@@ -11,10 +11,10 @@
     Only outputs a report of licenses and does not change the number of purchased seats.
 
 .EXAMPLE
-    .\AutoUpdateCSPLicenses.ps1
+    .\CSPLicenseUpdater.ps1
 
 .NOTES
-    FileName:           AutoUpdateCSPLicenses.ps1
+    FileName:           CSPLicenseUpdater.ps1
     Author:             Yoel Abraham
     Contributors:       Magnus Schöllin (API)
     Contact:            Yoel.Abraham@rts.se
