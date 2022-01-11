@@ -33,16 +33,22 @@ Param(
 
 
 #region Authenticate to Office 365
+
 # Set variables for O365 account
-$SecretName = "CSPLicenseUpdater"
-$Secret = Get-Secret $SecretName
-$SecretInfo = Get-SecretInfo $SecretName
-$O365UserName = $SecretInfo.Metadata.O365UserName  # Get username from powershell secret vault metadata
+$Secretname = "CSPLicenseUpdater"
+$Secret = Get-Secret $Secretname
+$SecretInfo = Get-SecretInfo $Secretname
+$O365Username = $SecretInfo.Metadata.O365Username  # Get username from powershell secret vault metadata
 $O365Password = $Secret.O365Password               # Get password from powershell secret vault
-$O365Creds = New-Object System.Management.Automation.PSCredential -ArgumentList ($O365UserName, $O365Password)
+$O365Creds = New-Object System.Management.Automation.PSCredential -ArgumentList ($O365Username, $O365Password)
 
 # Connect to MSOnline
-Connect-MsolService -Credential $O365Creds
+Try{
+    Connect-MsolService -Credential $O365Creds -ErrorAction Stop
+}Catch [System.Exception] {
+    Throw "Failed to connect to MsolService: Error message: $($_.Exception.Message)"
+    Break
+}
 
 #endregion
 
@@ -111,7 +117,7 @@ $AllLicenses += [PSCustomObject]@{ "Name"=$EMSName  ; "SkuPartNumber"=$EMSSkuPar
 
 
 
-#region Create necessary folder for log and report exports
+#region Create necessary folder for log and report exports and remove old logs and reports
 
 $ErrorActionPreference = "Stop"
 try {
@@ -125,20 +131,21 @@ try {
     New-Item $CSPReportFolderPath -ItemType Directory -Force | Out-Null
     New-Item $ReportOnlyFolderPath -ItemType Directory -Force | Out-Null
 }
-catch {
-    throw $_
+catch [System.Exception] {
+    Throw "Failed to create log and report folders. Error message: $($_.Exception.Message)"
     Break
 }
+
 Write-Verbose "Successfully verified Logs and Reports folder."
 $ErrorActionPreference = "Continue"
+
+# Remove logs and reports older than 90 days
+Get-ChildItem –Path $LogFolderPath| Where{($_.LastWriteTime -lt (Get-Date).AddDays(-90))} | Remove-Item -Force
+Get-ChildItem –Path $CSPReportFolderPath | Where{($_.LastWriteTime -lt (Get-Date).AddDays(-90))} | Remove-Item -Force
 
 #endregion
 
 
-
-# Remove logs and reports older than 90 days
-Get-ChildItem –Path $LogFolderPath -Recurse | Where-Object {($_.LastWriteTime -lt (Get-Date).AddDays(-90))} | Remove-Item -Force
-Get-ChildItem –Path $CSPReportFolderPath -Recurse | Where-Object {($_.LastWriteTime -lt (Get-Date).AddDays(-90))} | Remove-Item -Force
 
 
 
@@ -186,7 +193,7 @@ function Write-LogEntry {
 
 
 
-# Function for connecting to Arrow CSP API
+# Function for connecting to Arrow CSP API @ Magnus.Schollin@rts.se
 function Connect-CSPAPI {
     [CmdletBinding()]
     Param()
@@ -208,7 +215,7 @@ function Connect-CSPAPI {
 
 
 
-# Function for fetching all CSP purchased licenses and seats
+# Function for fetching all CSP purchased licenses and seats @ Magnus.Schollin@rts.se
 function Get-CSPLicenses {
     [CmdletBinding()]
     Param()
@@ -218,7 +225,7 @@ function Get-CSPLicenses {
 
 
 
-# Function for updating the number of seats for a purchased license.
+# Function for updating the number of seats for a purchased license. @ Magnus.Schollin@rts.se
 function Update-CSPLicense {
     [CmdletBinding()]
     param(
@@ -283,7 +290,7 @@ catch [System.Exception] {
 
 #region Check license assignments in Office 365
 
-# Verify that provided AccountSkuIds match with the AccountSkuIds found in Office 365
+# Verify that the manually provided AccountSkuIds in variables above match with the AccountSkuIds found in Office 365
 Write-LogEntry -Message "Verifying AccountSkuIds"
 $AllLicenses | ForEach-Object {
     if ($AllAccountSkus.AccountSkuId -notcontains $_.AccountSkuId) {
@@ -304,13 +311,13 @@ if ($VerificationError) {
 
 
 
-# Create array for all license assignment info to be added to
+# Create an empty array variable for all license assignment info to be added to
 $O365Result = @()
 
 # Loop every license from $AllLicenses array
 Write-LogEntry -Message "Processing O365 information"
 foreach ($License in $AllLicenses) {
-    # Create empty array variable for users to be added to
+    # Create an empty array variable for users to be added to
     $Users = @()
     
     # Add all users with the license assigned to $Users
@@ -384,11 +391,15 @@ if ($ProcessLicenses) {
                 Write-LogEntry -Message "Processing license seat changes in CSP-portal"
             }
             
+            # Create an empty array variable for the end result info
             $ExportResult = @()
+            
+            # Loop every license with assignment difference count
             foreach ($License in $ProcessLicenses) {
                 # Match Office 365 license from all the gathered purchased license from CSP.
                 $CSPLicense = $AllPurchasedSeats | where{$_.license_id -eq $License.CSPLicenseId}
 
+                # If no licenses are matched, send error and skip to next in loop
                 if (!$CSPLicense) {
                     Write-LogEntry -Severity ERROR -Message "'$($License.CSPLicenseId)' was not matched with any CSP license."
                 }else {
@@ -433,6 +444,7 @@ if ($ProcessLicenses) {
                     }
                 }
 
+                # Insert end result to variable for export
                 if ($ReportOnly) {
                     $row = [PSCustomObject]@{ "Name"=$CSPLicense.name ; "O365AccountSkuId"=$License.AccountSkuId ; "O365TotalUsers"=$License.TotalUsers ; "O365ActiveUnits"=$License.ActiveUnits ; "O365ConsumedUnits"=$License.ConsumedUnits ; "CSPLicenseId"=$CSPLicense.license_id ; "CSPLicenseState"=$CSPLicense.state ; "CSPPurchasedSeats"=$PurchasedSeats ; "CSPNewPurchasedSeats"=$NewPurchasedSeats ; "SeatsDifference"=$License.Difference }
                 }else {
