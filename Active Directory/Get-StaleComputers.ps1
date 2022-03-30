@@ -42,7 +42,7 @@
  
     # Gather Computer Data from Active Directory and Analyze
     Write-Verbose -Message "Querying Active Directory for Computer Objects..." 
-    $AllADComputerObjects = (Get-ADComputer -Filter * -Properties $ComputerPropsAll)
+    $AllADComputerObjects = (Get-ADComputer -Filter "OperatingSystem -notlike '*Server*'" -Properties $ComputerPropsAll)
  
     Write-Verbose -Message "Searching Active Directory for Stale ($DaysAgo Days) Computers."
     $StaleDate = (Get-Date).AddDays($DaysAgo)
