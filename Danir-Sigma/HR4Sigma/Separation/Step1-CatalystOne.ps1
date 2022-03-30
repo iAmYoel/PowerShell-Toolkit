@@ -14,7 +14,6 @@ param
     [string]$departmentnumber = "",             #1070 - Kostnadsställe/Sektion
     [string[]]$dggroup        = @("N/A"),       #Finns inte med
     [string]$sggroup          = "N/A",          #Finns inte med
-    [string[]]$sgcivilgroup   = @("N/A"),       #Finns inte med
     [string]$street           = "",             #1259 - Kontorsadress
     [string]$city             = "",             #14 - Arbetsplatsort
     #[string]$zipcode          = "",             #Finns inte med
@@ -27,6 +26,9 @@ param
     [string]$expire           = ""              #38 - Slutdatum
 )
 
+# Root CatalystOne Integration folder
+$RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
+
 # Functions
 
 function check-user
@@ -35,12 +37,12 @@ function check-user
     if ($user -ne $null)
     {
         "$date - $alias exist. Change.`r`n" | Out-File $loginfo -Append
-        . C:\hr4sigma\powershell\Sigma-ChangeUser-HR4Sigma.ps1 -alias $alias -fornamn $fornamn -efternamn $efternamn -userphone $userphone -jobtitle $jobtitle -usermanager $usermanager -company $company -department $department -departmentnumber $departmentnumber -dggroup $dggroup -sggroup $sggroup -sgcivilgroup $sgcivilgroup -street $street -city $city -country $countryprefix -o365 $o365 -expire $expire -cinodeactive $cinodeactive -companyid $companyid -cunumber $cunumber -cuname $cuname
+        . $PSScriptRoot\ChangeUser-CatalystOne.ps1 -alias $alias -fornamn $fornamn -efternamn $efternamn -userphone $userphone -jobtitle $jobtitle -usermanager $usermanager -company $company -department $department -departmentnumber $departmentnumber -dggroup $dggroup -sggroup $sggroup -street $street -city $city -country $countryprefix -o365 $o365 -expire $expire -cinodeactive $cinodeactive -companyid $companyid -cunumber $cunumber -cuname $cuname
     }
     else
     {
         "$date - $alias doesn't exist. Create.`r`n" | Out-File $loginfo -Append
-        . C:\hr4sigma\powershell\Sigma-NewUser-HR4Sigma.ps1 -alias $alias -fornamn $fornamn -efternamn $efternamn -userphone $userphone -jobtitle $jobtitle -usermanager $usermanager -company $company -department $department -departmentnumber $departmentnumber -dggroup $dggroup -sggroup $sggroup -sgcivilgroup $sgcivilgroup -street $street -city $city -country $countryprefix -o365 $o365 -expire $expire -cinodeactive $cinodeactive -companyid $companyid -cunumber $cunumber -cuname $cuname
+        . $PSScriptRoot\NewUser-CatalystOne.ps1 -alias $alias -fornamn $fornamn -efternamn $efternamn -userphone $userphone -jobtitle $jobtitle -usermanager $usermanager -company $company -department $department -departmentnumber $departmentnumber -dggroup $dggroup -sggroup $sggroup -street $street -city $city -country $countryprefix -o365 $o365 -expire $expire -cinodeactive $cinodeactive -companyid $companyid -cunumber $cunumber -cuname $cuname
     }
 }
     
@@ -122,25 +124,11 @@ function check-values
 
 function load-modules
 {
-    #Exchange
-    try
-    {
-        $exch=New-PSSession -ConnectionUri http://ss0251/powershell -ConfigurationName Microsoft.Exchange 
-        Import-PSSession $exch -AllowClobber -DisableNameChecking -ErrorAction Stop
-    }
-    catch
-    {
-        Write-Error "ERROR! Kan inte ladda Exchange Modul"
-        "$date - ERROR! Kan inte ladda Exchange Modul" | Out-File $logerror -Append
-        $emailtext = "ERROR! Kan inte ladda Exchange Modul - $date"
-        Send-MailMessage -From $From -To $To -Subject $subject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
-        Break
-    }
 
     #Active Directory
     try
     {
-        Import-Module activedirectory -ErrorAction Stop
+        Import-Module ActiveDirectory -ErrorAction Stop
     }
     catch
     {
@@ -182,17 +170,17 @@ function unload-modules
 
 $date = Get-Date -Format "yyyy-MM-dd HH:mm"
 $logdate = Get-Date -Format "yyyyMMdd"
-$logerror = "C:\hr4sigma\log\sigma-step1_error_HR4Sigma$logdate.log"
-$loginfo = "C:\hr4sigma\log\sigma-step1_info_HR4Sigma$logdate.log"
+$logerror = "$RootFolder\log\step1-error-CatalystOne_$logdate.log"
+$loginfo = "$RootFolder\log\step1-info-CatalystOne_$logdate.log"
 
 #Mail Settings
 $SMTPServer = "smtprelay.net.sigma.se"
 $SMTPPort = 25
 $Username = ""
 $Encoding = [System.Text.Encoding]::UTF8
-$subject = "HR4Sigma ERROR!"
+$subject = "CatalystOne ERROR!"
 $From = "support@nexergroup.com"
-$To = "christian.spector@nexergroup.com"
+$To = "monitor-sd@sigma.se"
 
 # RUN
     

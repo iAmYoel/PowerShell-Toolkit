@@ -20,40 +20,28 @@ param
     #[string]$zipcode          = "",             #Finns inte med
     [string]$countryprefix    = "SE",           #24 - Land
     [string]$o365             = "",             #Finns inte med
-    [string]$cinodeactive     = "",             #attr 5
     [string]$companyid        = "",             #attr 6
-    [string]$cunumber         = "",             #attr 7
-    [string]$cuname           = "",             #attr 8
     [string]$expire           = ""              #38 - Slutdatum
 )
 
 ############################################################################
 
+# Root HR4Sigma Integration folder
+$RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
+
 # Import Librarys
 
-. "C:\hr4sigma\library\Nexer-Company-HR4Sigma.ps1"
+. "$RootFolder\library\Company-HR4Sigma.ps1"
 
 # Loading Modules
     
     function load-modules
     {
-    #Exchange
-    try
-    {
-        $exch=New-PSSession -ConnectionUri http://ss0251/powershell -ConfigurationName Microsoft.Exchange 
-        Import-PSSession $exch -AllowClobber -DisableNameChecking -ErrorAction Stop
-    }
-    catch
-    {
-        Write-Error "ERROR! Kan inte ladda Exchange Modul"
-        "$date - ERROR! Kan inte ladda Exchange Modul" | Out-File $logerror -Append
-        Break
-    }
 
     #Active Directory
     try
     {
-        Import-Module activedirectory -ErrorAction Stop
+        Import-Module ActiveDirectory -ErrorAction Stop
     }
     catch
     {
@@ -81,33 +69,6 @@ param
     }
 
 # Load functions
-
-    function Check-EALicense {
-        param (
-            [Parameter(Mandatory)]
-            [ValidateSet("E3","F3")]
-            [String]$License
-        )
-        
-
-        switch ($License) {
-            'E3' { [int32]$MaxUsers = 1472 }
-            'F3' { [int32]$MaxUsers = 525 }
-        }
-        
-        $EAGroupName = "SG_Office365-${License}_Nexer-EA"
-        $CSPGroupName = "SG_Microsoft365-${License}_Nexer-CSP"
-
-        $EAGroupMembersCount = (Get-ADGroupMember -Identity $EAGroupName -Recursive).Count
-
-        if ($EAGroupMembersCount -lt $MaxUsers) {
-            $AddGroup = $EAGroupName
-        }else {
-            $AddGroup = $CSPGroupName
-        }
-
-        Return $AddGroup
-    }
 
     function check-values
     {
@@ -169,52 +130,10 @@ param
     }
     }
 
-    function create-account-office365-activedirectory #tidigare funktion
+
+    function create-account-ad
     {
-        $fullName = $fornamn + " " + $efternamn
-        $UPN = "$cleanedFirstName.$cleanedLastName@sigma.se"
-        
-        # Check If Mailbox Exist
-        $Mailbox = Get-RemoteMailbox -Identity $UPN -ErrorAction SilentlyContinue
-        If ($Mailbox)
-        {
-            "$date - Mailbox $Mailbox exists, checking next available..." | Out-File $loginfo -Append #Returnerar DisplayName
-            Start-Sleep -s 2
-            $AddNumber = 1
-            Do
-            {
-                $AddNumber++
-                $NewUPN = $cleanedFirstName + "." + $cleanedLastName + $AddNumber + "@sigma.se"
-                $NewMailAddress = $cleanedFirstName + "." + $cleanedLastName + $AddNumber # Denna används till set-new-mailaddress
-                $NewMailbox = Get-RemoteMailbox -Identity $NewUPN -ErrorAction SilentlyContinue
-                #Write-Debug "Mailbox: $Mailbox"
-                #Write-Debug "UPN: $UPN"
-                #Write-Debug "NewMailbox: $NewUPN"
-                #Write-Debug "NewUPN: $NewUPN"
-                #Write-Debug "Domain: $Domain"
-                #Read-Host "OK?"
-            } Until(!$NewMailbox)
-
-            $newName = $fornamn + " " + $efternamn + $AddNumber
-            New-RemoteMailbox -name $newName -FirstName $fornamn -LastName $efternamn -displayname $fullName -SamAccountName $alias -Alias $alias -OnPremisesOrganizationalUnit $OU -UserPrincipalName $NewUPN -ResetPasswordOnNextLogon $false -Password $pw
-            
-            #cls
-            
-            Set-RemoteMailbox -Identity $alias -PrimarySmtpAddress "$NewMailAddress@$Domain" -EmailAddressPolicyEnabled $false -UserPrincipalName $NewUPN
-        }
-        Else
-        {
-            New-RemoteMailbox -name $fullName -FirstName $fornamn -LastName $efternamn -displayname $fullName -SamAccountName $alias -Alias $alias -OnPremisesOrganizationalUnit $OU -UserPrincipalName $UPN -ResetPasswordOnNextLogon $false -Password $pw
-        
-            #cls
-
-            Set-RemoteMailbox -Identity $alias -PrimarySmtpAddress "$cleanedFirstName.$cleanedLastName@$Domain" -EmailAddressPolicyEnabled $false -UserPrincipalName $UPN
-        }
-    }
-
-    function create-account-ad-exchangeonline
-    {
-        $CNnameCheck = Get-ADUser -Filter * -Properties cn | Where-Object {$_.cn -eq $namn}
+        $CNnameCheck = Get-ADUser -Filter "cn -like '$namn'"
         if (!$CNnameCheck) {$CNName = $namn}
         else
         {
@@ -224,16 +143,16 @@ param
             {
                 $AddNumber++
                 $CNName = $namn + $AddNumber
-                $NewCNNameCheck = Get-ADUser -Filter * -Properties cn | Where-Object {$_.cn -eq $CNName}
+                $NewCNNameCheck = Get-ADUser -Filter "cn -like '$CNName'"
             } Until(!$NewCNNameCheck)
             "$date - New CNName $CNName" | Out-File $loginfo -Append
         }
 
         $UPN = $cleanedFirstName + "." + $cleanedLastName + $AddNumber + "@sigma.se" #$AddNumber kan innehalla siffra men kan vara tomt, därför är denna UPN alltid korrekt.
-        $MailAddress = $cleanedFirstName + "." + $cleanedLastName + $AddNumber # Denna används till Set-RemoteMailbox -PrimarySmtpAddress
+        $MailAddress = $cleanedFirstName + "." + $cleanedLastName + $AddNumber # Denna används till New-ADUser -EmailAddress och Set-ADUser -ProxyAddresses
 
-        $Mailbox = Get-Recipient -Identity $UPN -ErrorAction SilentlyContinue
-        If ($Mailbox)
+        $UPNCheck = Get-ADUser -Filter "UserPrincipalName -like '$UPN'" -ErrorAction SilentlyContinue
+        If ($UPNCheck)
         {
             "$date - UPN $UPN exists, checking next available..." | Out-File $loginfo -Append #Returnerar DisplayName/CN Path
             $AddNumber = 1
@@ -242,27 +161,19 @@ param
 		        $AddNumber++
                 $CNName = $namn + $AddNumber
                 $UPN = $cleanedFirstName + "." + $cleanedLastName + $AddNumber + "@sigma.se"
-                #$NewMailAddress = $cleanedFirstName + "." + $cleanedLastName + $AddNumber # Denna används till Set-RemoteMailbox -PrimarySmtpAddress
-                $MailAddress = $cleanedFirstName + "." + $cleanedLastName + $AddNumber # Denna används till Set-RemoteMailbox -PrimarySmtpAddress
+                $MailAddress = $cleanedFirstName + "." + $cleanedLastName + $AddNumber # Denna används till New-ADUser -EmailAddress och Set-ADUser -ProxyAddresses
         
-                $NewCNNameCheck = Get-ADUser -Filter * -Properties cn | Where-Object {$_.cn -eq $CNName}
-		        $NewMailboxCheck = Get-Recipient -Identity $UPN -ErrorAction SilentlyContinue
+                $NewCNNameCheck = Get-ADUser -Filter "cn -like '$CNName'"
+		        $NewUPNCheck = Get-ADUser -Filter "UserPrincipalName -like '$UPN'" -ErrorAction SilentlyContinue
 	        } Until(!$NewCNNameCheck -and !$NewMailboxCheck)
     		
             "$date - New CNName $CNName, New UPN $UPN" | Out-File $loginfo -Append
 
-            New-RemoteMailbox -name $CNName -FirstName $fornamn -LastName $efternamn -displayname $namn -SamAccountName $alias -Alias $alias -OnPremisesOrganizationalUnit $OU -UserPrincipalName $UPN -ResetPasswordOnNextLogon $false -Password $pw
-	
-	        #Set-RemoteMailbox -Identity $alias -PrimarySmtpAddress "$NewMailAddress@$Domain" -EmailAddressPolicyEnabled $false -UserPrincipalName $UPN
-            Set-RemoteMailbox -Identity $alias -PrimarySmtpAddress "$MailAddress@$Domain" -EmailAddressPolicyEnabled $false -UserPrincipalName $UPN
         }
-        Else
-        {
-            New-RemoteMailbox -name $CNName -FirstName $fornamn -LastName $efternamn -displayname $namn -SamAccountName $alias -Alias $alias -OnPremisesOrganizationalUnit $OU -UserPrincipalName $UPN -ResetPasswordOnNextLogon $false -Password $pw
-	
-	        #Set-RemoteMailbox -Identity $alias -PrimarySmtpAddress "$cleanedFirstName.$cleanedLastName@$Domain" -EmailAddressPolicyEnabled $false -UserPrincipalName $UPN
-            Set-RemoteMailbox -Identity $alias -PrimarySmtpAddress "$MailAddress@$Domain" -EmailAddressPolicyEnabled $false -UserPrincipalName $UPN
-        }
+
+        New-ADUser -Name $CNName -GivenName $fornamn -Surname $efternamn -DisplayName $namn -SamAccountName $alias -UserPrincipalName $UPN -Path $OU -AccountPassword $pw -EmailAddress "$MailAddress@$Domain" -Enabled:$true
+
+        Set-ADUser -Identity $alias -Add @{ProxyAddresses="SMTP:$MailAddress@$Domain"}
 
     }
 
@@ -311,7 +222,7 @@ param
     {
         try
         {
-            $phone = Get-AdUser -Identity $usermanager -Properties mobile | Select -expand mobile -ErrorAction SilentlyContinue
+            $phone = Get-AdUser -Identity $usermanager -Properties mobile -ErrorAction Stop | Select -expand mobile
         }
         catch
         {
@@ -349,7 +260,7 @@ Inget SMS har skickats till chef eller användare." | Out-File $logsmserror -App
     {
         try
         {
-            $phone = Get-AdUser -Identity $alias -Properties mobile | Select -expand mobile -ErrorAction SilentlyContinue
+            $phone = Get-AdUser -Identity $alias -Properties mobile -ErrorAction Stop | Select -expand mobile
         }
         catch
         {
@@ -388,8 +299,9 @@ Inget SMS har skickats till användaren." | Out-File $logsmserror -Append
     function log
     {
 
-$usermail = Get-RemoteMailbox -Identity $alias | select -expand PrimarySmtpAddress
-$userupn = Get-RemoteMailbox -Identity $alias | select -expand UserPrincipalName
+        $UserObject = Get-ADUser -Identity $alias -Properties mail
+        $usermail = $UserObject.mail
+        $userupn = $UserObject.UserPrincipalName
 "Processing started (on " + $date + "):
 --------------------------------------------
 :::PARAMS:::
@@ -419,6 +331,8 @@ DATE: $date
 CLEAN FIRSTNAM: $cleanedFirstName
 CLEAN LASTNAME: $cleanedLastName
 
+    ADD GROUPS: $($AddGroups -join ", ")
+
 :::ARRAY FIX:::
 
 PATH: $OU
@@ -436,18 +350,18 @@ DATABASE: $database
     $Username = ""
     $Encoding = [System.Text.Encoding]::UTF8
     
-    $From = "support@nexergroup.com"
+    $From = "support@sigma.se"
     $To = Get-Email $usermanager
     $subject = "$namn's account is now created"
     $usermail = Get-Email $alias
     $usermanagername = Get-UserManagerName $usermanager
         
-    if($company -eq "Nexer Tech Talent AB")
+    if($company -eq "Sigma Civil AB")
     {$emailtext = "
     Hi, $namn's account is now created
 
     Username: SIGMA\$alias
-    Password: Sent to users phone
+    Password: Sent to manager $($usermanagername.displayname)
     Email: $usermail
     Mobile: $userphone
     Title: $jobtitle
@@ -456,6 +370,7 @@ DATABASE: $database
     Department number: $departmentnumber
     DL: $dggroup
     SG: $sggroup
+    Systemgrupp: $sgcivilgroup
     Work place: $city
     Office 365 License: $o365
     Account expire date: $expire
@@ -464,12 +379,11 @@ DATABASE: $database
     PX-password: $alias
 
     Best Regards
-    Nexer Support
+    Sigma Support
 
-    Email: support@nexergroup.com
+    Email: support@rts.se
     Phone from Sweden: 020- 510 520
     Phone from abroad +46 (0)10- 102 50 50   
-    Nexer phone switchboard: 020-550 550
     "
     }
     else
@@ -494,12 +408,11 @@ DATABASE: $database
     PX-password: $alias
 
     Best Regards
-    Nexer Support
+    Sigma Support
 
-    Email: support@nexergroup.com
+    Email: support@rts.se
     Phone from Sweden: 020- 510 520
     Phone from abroad +46 (0)10- 102 50 50   
-    Nexer phone switchboard: 020-550 550
     "
     }
 
@@ -545,8 +458,9 @@ DATABASE: $database
 
     function return-info
     {
-        $usermail = Get-RemoteMailbox -Identity $alias | select -expand PrimarySmtpAddress
-        $userupn = Get-RemoteMailbox -Identity $alias | select -expand UserPrincipalName
+        $UserObject = Get-ADUser -Identity $alias -Properties mail
+        $usermail = $UserObject.mail
+        $userupn = $UserObject.UserPrincipalName
 
         Write-Output "Användarnamn;$alias UserMail;$usermail UPN;$userupn"
     }
@@ -586,25 +500,10 @@ DATABASE: $database
         employeeNumber = if($departmentnumber){$departmentnumber}else{$null}
         }
 
-        if($cinodeactive -eq "")
-        {set-aduser @props}
-        else
-        {set-aduser @props -Add @{extensionAttribute5 = "$cinodeactive"}}
-
         if($companyid -eq "")
         {set-aduser @props}
         else
         {set-aduser @props -Add @{extensionAttribute6 = "$companyid"}}
-
-        if($cunumber -eq "")
-        {set-aduser @props}
-        else
-        {set-aduser @props -Add @{extensionAttribute7 = "$cunumber"}}
-
-        if($cuname -eq "")
-        {set-aduser @props}
-        else
-        {set-aduser @props -Add @{extensionAttribute8 = "$cuname"}}
 
         if($departmentnumber -eq "")
         {set-aduser @props}
@@ -616,48 +515,87 @@ DATABASE: $database
     {
         # Create variables where all group memberships to be added and to be removed are gathered and defined
         $AddGroups = @()
-        $RemoveGroups = @()
 
         # Switch to match which company the user belongs to and adds the correct group to $AddGroups
-        $AddGroups = @()
         $AddGroups += switch ($company) {
-            "Nexer AB"                              { "ITC Office $city" }
-           #"Nexer Asset Management AS"             {}
-            "Nexer Asset Management Oy"             { "ITC Finland Office $city" }
-            "Nexer Cybersecurity AB"                { "Cybersecurity Office $city" }
-            "Nexer Digital Ltd"                     { "ITC UK Office $city" }
-            "Nexer Enterprise Applications AB"      { "Dynamics Office $city" }
-            "Nexer Enterprise Applications Inc"     { "Enterprise Applications Inc Office $city" }
-            "Nexer Enterprise Applications Ltd"     { "Enterprise Applications Ltd Office $city" }
-            "Nexer Enterprise Applications Prv Ltd" { "ITC India Enterprise Applications Office $city" }
-            "Nexer Infrastructure AB"               { "IT Tech Office $city" }
-            "Nexer Insight AB"                      { "IoT AI Office $city" }
-            "Nexer Insight Inc"                     { "ITC Office $city" }
-            "Nexer Insight Ltd"                     { "ITC Insight Ltd Office $city" }
-            "Nexer Insight Sp. z o.o."              { "ITC Insight Poland Office $city" }
-            "Nexer IT Services AB"                  { "NITS Office $city" }
-            "Nexer Prv Ltd"                         { "ITC Office $city" }
-            "Nexer Recruit AB"                      { "Recruit Office $city" }
-            "Nexer Sp. z o.o."                      { "ITC Office $city" }
-            "Sigma IT Polska Sp. z o.o."            { "ITC Office $city" }
-            "Nexer Tech Talent AB"                  { "Young Talent Office $city" }
+            "Danir AB"                              { "Danir Office $city" }
+            "Sigma Cybersecurity AB"                { "Cybersecurity Office $city" }
+            "Sigma Civil AB"                        {
+                                                        if($city -like "Stockholm")
+                                                            { "Civil Office Stockholm Liljeholmen" }
+                                                        else
+                                                            { "Civil Office $city" }
+                                                        
+                                                        foreach ($cg in $sgcivilgroup)
+                                                        {
+                                                            if ($cg -notlike "N/A") {
+                                                                $cg
+                                                            }
+                                                        }
+                                                    }
+            "Sigma Connectivity AB"                 { @("og-ConnectivityAll","Connectivity SWE Office $city") }
+            "Sigma Connectivity ApS"                {
+                                                        if($city -like "Köpenhamn")
+                                                            { @("og-ConnectivityAll","Connectivity DK Office Copenhagen") }
+                                                        else
+                                                            { @("og-ConnectivityAll","Connectivity DK Office $city") }
+                                                    }
+            "Sigma Connectivity Inc."               { @("og-ConnectivityAll","Connectivity INC Office $city") }
+            "Sigma Connectivity Sp. z o.o."         { @("og-ConnectivityAll","Connectivity PL Office $city") }
+            "Sigma Connectivity Engineering AB"     { @("og-ConnectivityAll","SC Engineering Office $city") }
+            "Sigma Embedded Engineering AB"         { "Embedded Engineering Office $city" }
+            "Sigma Energy & Marine AB"              { "Energy Marine Office $city" }
+            "Sigma Energy & Marine AS"              { "Energy Marine AS Office $city" }
+            "Sigma Industry East North AB"          { "Industry East North Office $city" }
+            "Sigma Industry Evolution AB"           { "Industry Evolution Office $city" }
+           #"Sigma Industry Inc."                   { "SII Office $city" }
+            "Sigma Industry Solutions AB"           { "Industry Solutions Office $city" }
+            "Sigma Industry South AB"               { "Industry South Office $city" }
+            "Sigma Industry West AB"                { "Industry West Office $city" }
+            "Sigma Quality & Compliance AB"         {
+                                                        if($city -like "Göteborg")
+                                                            { "QC Office Gothenburg" }
+                                                        else
+                                                            { "QC Office $city" }
+                                                    }
+            "Sigma Quality & Compliance ApS"        {
+                                                        if($city -like "Göteborg")
+                                                            { "QC Office Gothenburg" }
+                                                        else
+                                                            { "QC Office $city" }
+                                                    }
+            "aptio group Sweden AB"                 {
+                                                        if($city -eq "Göteborg")
+                                                            { "QC Office Gothenburg" }
+                                                        else
+                                                            { "QC Office $city" }
+                                                    }
+            "aptio group Denmark ApS"               {
+                                                        if($city -eq "Göteborg")
+                                                            { "QC Office Gothenburg" }
+                                                        else
+                                                            { "QC Office $city" }
+                                                    }
+           #"Sigma Software LLC"                    {}
             Default                                 { "Office $city All" }
         }
         
         # SG Groups
-        if($sggroup -notlike "N/A")
+        foreach ($item in $sggroup)
         {
-            $AddGroups += $sggroup
+            if ($item -notlike "N/A") {
+                $AddGroups += $item
+            }
         }
 
         # DG Groups
-        if($dggroup -notlike "N/A")
+        foreach ($item in $dggroup)
         {
-            foreach ($g in $dggroup)
-            {
-                $AddGroups += $dggroup
+            if ($item -notlike "N/A") {
+                $AddGroups += $item
             }
         }
+        
         
         # Office365
         # If license value passed from HR4Sigma
@@ -665,10 +603,10 @@ DATABASE: $database
         {
             # Checks the $O365 value that has been passed from HR4Sigma. Sets the correct Security group depending on the value.
             $o365group = switch ($o365) {
-                "E1"            { "SG_Office365-E1_Nexer-CSP" }
-                "F1"            { Check-EALicense -License "F3" }
-                "F3"            { Check-EALicense -License "F3" }
-                "E3"            { Check-EALicense -License "E3" }
+                "E1"            { "SG_Office365-E1_Sigma-CSP" }
+                "F1"            { "SG_Microsoft365-F3_Sigma-CSP" }
+                "F3"            { "SG_Microsoft365-F3_Sigma-CSP" }
+                "E3"            { "SG_Microsoft365-E3_Sigma-CSP" }
                 "Ingen licens"  {}
                 "Underkonsult"  {}
                 "UK"            {}
@@ -696,59 +634,44 @@ DATABASE: $database
     
     function sms-and-mail
     {
-    
-    $SMTPServer = "smtprelay.net.sigma.se"
-    $SMTPPort = 25
-    $SMSSubject = " "
-    $MailSubject = "$namn's account is now created"
-    $Encoding = [System.Text.Encoding]::UTF8
-    $SMSFrom = "support@sigma.se"
-    $MailFrom = "support@nexergroup.com"
+        
+        $SMTPServer = "smtprelay.net.sigma.se"
+        $SMTPPort = 25
+        $SMSSubject = " "
+        $MailSubject = "$namn's account is now created"
+        $Encoding = [System.Text.Encoding]::UTF8
+        $SMSFrom = "support@sigma.se"
+        $MailFrom = "support@sigma.se"
 
-    # SMS
-    if ($company -eq "Nexer Tech Talent AB"){
-        $nr = Get-PhoneNumber-User
+        # SMS
 
-        if($nr){
-            $Recipient = $nr + "@qlnk.se"
-            $SMStext =
-            "Hi!`nHere's the password for your account: $pwd
-            `nBR`nNexer Support"
-
-            Send-MailMessage -From $SMSFrom -To $Recipient -Subject $SMSSubject -Body $SMStext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding -ErrorAction SilentlyContinue
-            }
-        else{
-            $nonr = "No Number"
-            }
-        }
-    else{
         $nr = Get-PhoneNumber-Manager
         
         if($nr){
             $Recipient = $nr + "@qlnk.se"
             $SMStext =
             "Hi!`nHere's the password for user: `n$namn`nPassword: $pwd
-            `nBR`nNexer Support"
+            `nBR`nSigma Support"
 
             Send-MailMessage -From $SMSFrom -To $Recipient -Subject $SMSSubject -Body $SMStext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding -ErrorAction SilentlyContinue
             }
         else{
             $nonr = "No Number"
             }
-        }    
+   
 
-    # Mail
+        # Mail
 
-    $To = Get-Email $usermanager
-    $usermail = Get-Email $alias
-    $usermanagername = Get-UserManagerName
-        
-    if($company -eq "Nexer Tech Talent AB" -and $nonr){
-    $emailtext = "
+        $To = Get-Email $usermanager
+        $usermail = Get-Email $alias
+        $usermanagername = Get-UserManagerName
+            
+        if($company -eq "Sigma Civil AB" -and $nonr){
+            $emailtext = "
     Hi, $namn's account is now created
 
     Username: SIGMA\$alias
-    Password: Phone number missing, no password has been sent!
+    Password: Manager or phone number missing, no password has been sent!
     Email: $usermail
     Mobile: $userphone
     Title: $jobtitle
@@ -757,6 +680,7 @@ DATABASE: $database
     Department number: $departmentnumber
     DL: $dggroup
     SG: $sggroup
+    Systemgrupp: $sgcivilgroup
     Work place: $city
     Office 365 License: $o365
     Account expire date: $expire
@@ -765,20 +689,19 @@ DATABASE: $database
     PX-password: $alias
 
     Best Regards
-    Nexer Support
+    Sigma Support
 
-    Email: support@nexergroup.com
+    Email: support@rts.se
     Phone from Sweden: 020- 510 520
-    Phone from abroad +46 (0)10- 102 50 50   
-    Nexer phone switchboard: 020-550 550
+    Phone from abroad +46 (0)10- 102 50 50
     "
-    }
-    elseif($company -eq "Nexer Tech Talent AB"){
-    $emailtext = "
+        }
+        elseif($company -eq "Sigma Civil AB"){
+            $emailtext = "
     Hi, $namn's account is now created
 
     Username: SIGMA\$alias
-    Password: Sent to phone
+    Password: Sent to manager $($usermanagername.displayname)
     Email: $usermail
     Mobile: $userphone
     Title: $jobtitle
@@ -787,6 +710,7 @@ DATABASE: $database
     Department number: $departmentnumber
     DL: $dggroup
     SG: $sggroup
+    Systemgrupp: $sgcivilgroup
     Work place: $city
     Office 365 License: $o365
     Account expire date: $expire
@@ -795,16 +719,15 @@ DATABASE: $database
     PX-password: $alias
 
     Best Regards
-    Nexer Support
+    Sigma Support
 
-    Email: support@nexergroup.com
+    Email: support@rts.se
     Phone from Sweden: 020- 510 520
-    Phone from abroad +46 (0)10- 102 50 50   
-    Nexer phone switchboard: 020-550 550
+    Phone from abroad +46 (0)10- 102 50 50
     "
-    }
-    if($company -ne "Nexer Tech Talent AB" -and $nonr){
-    $emailtext = "
+        }
+        if($company -ne "Sigma Civil AB" -and $nonr){
+            $emailtext = "
     Hi, $namn's account is now created
 
     Username: SIGMA\$alias
@@ -825,83 +748,65 @@ DATABASE: $database
     PX-password: $alias
 
     Best Regards
-    Nexer Support
+    Sigma Support
 
-    Email: support@nexergroup.com
+    Email: support@rts.se
     Phone from Sweden: 020- 510 520
-    Phone from abroad +46 (0)10- 102 50 50   
-    Nexer phone switchboard: 020-550 550
+    Phone from abroad +46 (0)10- 102 50 50
     "
-    }
-    elseif($company -ne "Nexer Tech Talent AB"){
-    $emailtext = "
-    Hi, $namn's account is now created
+        }
+        elseif($company -ne "Sigma Civil AB"){
+        $emailtext = "
+        Hi, $namn's account is now created
 
-    Username: SIGMA\$alias
-    Password: Sent to manager $($usermanagername.displayname)
-    Email: $usermail
-    Mobile: $userphone
-    Title: $jobtitle
-    Company: $company
-    Department: $department
-    Department number: $departmentnumber
-    DL: $dggroup
-    SG: $sggroup
-    Work place: $city
-    Office 365 License: $o365
-    Account expire date: $expire
+        Username: SIGMA\$alias
+        Password: Sent to manager $($usermanagername.displayname)
+        Email: $usermail
+        Mobile: $userphone
+        Title: $jobtitle
+        Company: $company
+        Department: $department
+        Department number: $departmentnumber
+        DL: $dggroup
+        SG: $sggroup
+        Work place: $city
+        Office 365 License: $o365
+        Account expire date: $expire
 
-    PX: $alias
-    PX-password: $alias
+        PX: $alias
+        PX-password: $alias
 
-    Best Regards
-    Nexer Support
+        Best Regards
+        Sigma Support
 
-    Email: support@nexergroup.com
-    Phone from Sweden: 020- 510 520
-    Phone from abroad +46 (0)10- 102 50 50   
-    Nexer phone switchboard: 020-550 550
-    "
-    }
+        Email: support@rts.se
+        Phone from Sweden: 020- 510 520
+        Phone from abroad +46 (0)10- 102 50 50
+        "
+        }
 
-    Send-MailMessage -From $MailFrom -To $To -Subject $MailSubject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
-    Send-MailMessage -From $MailFrom -To "christian.spector@nexergroup.com" -Subject $MailSubject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
+        Send-MailMessage -From $MailFrom -To $To -Subject $MailSubject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
+        Send-MailMessage -From $MailFrom -To "christian.spector@nexergroup.com" -Subject $MailSubject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
 
     }
 
     function sms-with-password #tidigare funktion
     {
-    $SMTPServer = "smtprelay.net.sigma.se"
-    $SMTPPort = 25
-    $From = "support@sigma.se"
-    $SMSSubject = " "
-    $Encoding = [System.Text.Encoding]::UTF8
-    
-    if ($company -eq "Nexer Tech Talent AB"){
-        $nr = Get-PhoneNumber-User $alias
-
-        if($nr){
-            $Recipient = $nr + "@qlnk.se"
-            $smstext =
-            "Hi!`nHere's the password for your account: $pwd
-            `nBR`nNexer Support"
-
-            Send-MailMessage -From $From -To $Recipient -Subject $SMSSubject -Body $smstext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding -ErrorAction SilentlyContinue
-            }
-        else{}
-        }
-    else {
+        $SMTPServer = "smtprelay.net.sigma.se"
+        $SMTPPort = 25
+        $From = "support@sigma.se"
+        $SMSSubject = " "
+        $Encoding = [System.Text.Encoding]::UTF8
+        
         $nr = Get-PhoneNumber-Manager $usermanager
         
         if($nr){
             $Recipient = $nr + "@qlnk.se"
             $smstext =
-            "Hi!`nHere's the password for user: `n$namn`nPassword: $pwd
-            `nBR`nNexer Support"
+        "Hi!`nHere's the password for user: `n$namn`nPassword: $pwd
+        `nBR`nSigma Support"
 
             Send-MailMessage -From $From -To $Recipient -Subject $SMSSubject -Body $smstext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding -ErrorAction SilentlyContinue
-            }
-        else{}
         }
     }
 
@@ -915,10 +820,10 @@ load-modules
 
 $date = get-date -format "yyyy-MM-dd HH:mm"
 $logdate = Get-Date -Format "yyyyMMdd"
-$log= "C:\hr4sigma\log\nexer-new_user_HR4Sigma$logdate.log"
-$logerror = "C:\hr4sigma\log\nexer-new_user_error_HR4Sigma$logdate.log"
-$loginfo = "C:\hr4sigma\log\nexer-new_user_info_HR4Sigma$logdate.log"
-$logsmserror = "C:\hr4sigma\log\nexer-sms_error_HR4Sigma$logdate.log"
+$log= "$RootFolder\log\new-user-HR4Sigma_$logdate.log"
+$logerror = "$RootFolder\log\new-user-error-HR4Sigma_$logdate.log"
+$loginfo = "$RootFolder\log\new-user-info-HR4Sigma_$logdate.log"
+$logsmserror = "$RootFolder\log\sms-error-HR4Sigma_$logdate.log"
 #$description = "HR4Sigma, $usermanager, $date"
 $description = "HR4Sigma"
 $namn = "$fornamn $efternamn" #Behövs för mail functionen
@@ -938,16 +843,14 @@ $Domain = $ListOfCompanys["select"][$Company]["Domain"]
 # Run
 
 check-values
-#create-account-office365-activedirectory
-create-account-ad-exchangeonline
+
+create-account-ad
 
 Start-Sleep -Seconds 10 # För att den ska få tid att skapa upp konto innan info sätts
 
 set-account-info
 
-if ($company -notlike "Nexer IT Services AB") {
-    set-account-memberof
-}
+set-account-memberof
 
 set-account-expire
 

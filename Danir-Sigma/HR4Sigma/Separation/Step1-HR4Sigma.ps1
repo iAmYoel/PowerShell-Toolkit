@@ -20,12 +20,12 @@ param
     #[string]$zipcode          = "",             #Finns inte med
     [string]$country          = "Sverige",      #24 - Land
     [string]$o365             = "",             #Finns inte med
-    [string]$cinodeactive     = "",             #attr 5
     [string]$companyid        = "",             #attr 6
-    [string]$cunumber         = "",             #attr 7
-    [string]$cuname           = "",             #attr 8
     [string]$expire           = ""              #38 - Slutdatum
 )
+
+# Root CatalystOne Integration folder
+$RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 
 # Functions
 
@@ -35,12 +35,12 @@ function check-user
     if ($user -ne $null)
     {
         "$date - $alias exist. Change.`r`n" | Out-File $loginfo -Append
-        . C:\hr4sigma\powershell\Nexer-ChangeUser-HR4Sigma.ps1 -alias $alias -fornamn $fornamn -efternamn $efternamn -userphone $userphone -jobtitle $jobtitle -usermanager $usermanager -company $company -department $department -departmentnumber $departmentnumber -dggroup $dggroup -sggroup $sggroup -sgcivilgroup $sgcivilgroup -street $street -city $city -country $countryprefix -o365 $o365 -expire $expire -cinodeactive $cinodeactive -companyid $companyid -cunumber $cunumber -cuname $cuname
+        . $PSScriptRoot\ChangeUser-HR4Sigma.ps1 -alias $alias -fornamn $fornamn -efternamn $efternamn -userphone $userphone -jobtitle $jobtitle -usermanager $usermanager -company $company -department $department -departmentnumber $departmentnumber -dggroup $dggroup -sggroup $sggroup -sgcivilgroup $sgcivilgroup -street $street -city $city -country $countryprefix -o365 $o365 -expire $expire -companyid $companyid
     }
     else
     {
         "$date - $alias doesn't exist. Create.`r`n" | Out-File $loginfo -Append
-        . C:\hr4sigma\powershell\Nexer-NewUser-HR4Sigma.ps1 -alias $alias -fornamn $fornamn -efternamn $efternamn -userphone $userphone -jobtitle $jobtitle -usermanager $usermanager -company $company -department $department -departmentnumber $departmentnumber -dggroup $dggroup -sggroup $sggroup -sgcivilgroup $sgcivilgroup -street $street -city $city -country $countryprefix -o365 $o365 -expire $expire -cinodeactive $cinodeactive -companyid $companyid -cunumber $cunumber -cuname $cuname
+        . $PSScriptRoot\NewUser-HR4Sigma.ps1 -alias $alias -fornamn $fornamn -efternamn $efternamn -userphone $userphone -jobtitle $jobtitle -usermanager $usermanager -company $company -department $department -departmentnumber $departmentnumber -dggroup $dggroup -sggroup $sggroup -sgcivilgroup $sgcivilgroup -street $street -city $city -country $countryprefix -o365 $o365 -expire $expire -companyid $companyid
     }
 }
     
@@ -122,25 +122,11 @@ function check-values
 
 function load-modules
 {
-    #Exchange
-    try
-    {
-        $exch=New-PSSession -ConnectionUri http://ss0251/powershell -ConfigurationName Microsoft.Exchange 
-        Import-PSSession $exch -AllowClobber -DisableNameChecking -ErrorAction Stop
-    }
-    catch
-    {
-        Write-Error "ERROR! Kan inte ladda Exchange Modul"
-        "$date - ERROR! Kan inte ladda Exchange Modul" | Out-File $logerror -Append
-        $emailtext = "ERROR! Kan inte ladda Exchange Modul - $date"
-        Send-MailMessage -From $From -To $To -Subject $subject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
-        Break
-    }
 
     #Active Directory
     try
     {
-        Import-Module activedirectory -ErrorAction Stop
+        Import-Module ActiveDirectory -ErrorAction Stop
     }
     catch
     {
@@ -182,8 +168,8 @@ function unload-modules
 
 $date = Get-Date -Format "yyyy-MM-dd HH:mm"
 $logdate = Get-Date -Format "yyyyMMdd"
-$logerror = "C:\hr4sigma\log\nexer-step1_error_HR4Sigma$logdate.log"
-$loginfo = "C:\hr4sigma\log\nexer-step1_info_HR4Sigma$logdate.log"
+$logerror = "$RootFolder\log\step1-error-HR4Sigma_$logdate.log"
+$loginfo = "$RootFolder\log\step1-info-HR4Sigma_$logdate.log"
 
 #Mail Settings
 $SMTPServer = "smtprelay.net.sigma.se"
@@ -191,8 +177,8 @@ $SMTPPort = 25
 $Username = ""
 $Encoding = [System.Text.Encoding]::UTF8
 $subject = "HR4Sigma ERROR!"
-$From = "support@nexergroup.com"
-$To = "christian.spector@nexergroup.com"
+$From = "support@sigma.se"
+$To = "monitor-sd@sigma.se"
 
 # RUN
     

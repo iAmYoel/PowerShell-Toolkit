@@ -31,7 +31,7 @@ param
 
 # Import Library
 
-. "C:\hr4sigma\library\Nexer-Company-HR4Sigma.ps1"
+. "C:\hr4sigma\library\Company-HR4Sigma.ps1"
 
 # Loading Modules
     
@@ -94,12 +94,12 @@ param
         $EAGroupMembersCount = (Get-ADGroupMember -Identity $EAGroupName -Recursive).Count
     
         if ($EAGroupMembersCount -lt $MaxUsers) {
-            $ReturnGroup = $EAGroupName
+            $AddGroup = $EAGroupName
         }else {
-            $ReturnGroup = $CSPGroupName
+            $AddGroup = $CSPGroupName
         }
     
-        Return $ReturnGroup
+        Return $AddGroup
     }
 
     function unload-modules
@@ -244,123 +244,181 @@ param
 
     function log
     {
-        $usermail = Get-RemoteMailbox -Identity $alias | select -expand PrimarySmtpAddress
-        $userupn = Get-RemoteMailbox -Identity $alias | select -expand UserPrincipalName
-        "Processing started (on " + $date + "):
-        --------------------------------------------
-        :::PARAMS:::
+$usermail = Get-RemoteMailbox -Identity $alias | select -expand PrimarySmtpAddress
+$userupn = Get-RemoteMailbox -Identity $alias | select -expand UserPrincipalName
+"Processing started (on " + $date + "):
+--------------------------------------------
+:::PARAMS:::
 
-        ALIAS: $alias
-        FÖRNAMN: $fornamn
-        EFTERNAMN: $efternamn
-        EMAIL: $usermail
-        UPN: $userupn
-        MOBILE: $userphone
-        TITEL: $jobtitle
-        CHEF: $usermanager
-        COMPANY: $company
-        DEPARTMENT: $department
-        DEPARTMENT NR: $departmentnumber
-        DG GRUPP: $dggroup
-        SG GRUPP: $sggroup
-        Civil Systemgrupp: $sgcivilgroup
-        CITY: $city
-        O365: $o365
-        EXPIRE DATE: $expire
+ALIAS: $alias
+FÖRNAMN: $fornamn
+EFTERNAMN: $efternamn
+EMAIL: $usermail
+UPN: $userupn
+MOBILE: $userphone
+TITEL: $jobtitle
+CHEF: $usermanager
+COMPANY: $company
+DEPARTMENT: $department
+DEPARTMENT NR: $departmentnumber
+DG GRUPP: $dggroup
+SG GRUPP: $sggroup
+Civil Systemgrupp: $sgcivilgroup
+CITY: $city
+O365: $o365
+EXPIRE DATE: $expire
 
-        :::AUTOFIX:::
+:::AUTOFIX:::
 
-        NAMN: $namn
-        DATE: $date
-        CLEAN FIRSTNAM: $cleanedFirstName
-        CLEAN LASTNAME: $cleanedLastName
+NAMN: $namn
+DATE: $date
+CLEAN FIRSTNAM: $cleanedFirstName
+CLEAN LASTNAME: $cleanedLastName
 
-        :::ARRAY FIX:::
+:::ARRAY FIX:::
 
-        PATH: $OU
-        DATABASE: $database
-        "+ "`r`n" | Out-File $log -append
-        "`r" | Out-File $loginfo -append
+PATH: $OU
+DATABASE: $database
+"+ "`r`n" | Out-File $log -append
+"`r" | Out-File $loginfo -append
     }
 
 
     function mail
     {
-        $SMTPServer = "smtprelay.net.sigma.se"
-        $SMTPPort = 25
-        $Username = ""
-        $Encoding = [System.Text.Encoding]::UTF8
-        
-        $From = "support@nexergroup.com"
-        $To = Get-Email $usermanager
-        $subject = "$namn's account is now changed"
-        $usermail = Get-Email $alias
-        $usermanagername = Get-UserManagerName
-        
-        $px = create-px
+    
+    $SMTPServer = "smtprelay.net.sigma.se"
+    $SMTPPort = 25
+    $Username = ""
+    $Encoding = [System.Text.Encoding]::UTF8
+    
+    $From = "support@nexergroup.com"
+    $To = Get-Email $usermanager
+    $subject = "$namn's account is now changed"
+    $usermail = Get-Email $alias
+    $usermanagername = Get-UserManagerName
+    
+    $px = create-px
 
-        if($px -like "System.Data.DataRow")
-        {
-            $emailtext = "
-            Hi, $namn's account is now changed
+    if($company -eq "Sigma Civil AB" -and $px -eq "" -or $px -eq $null)
+    {$emailtext = "
+    Hi, $namn's account is now changed
 
-            Username: SIGMA\$alias
-            Email: $($usermail.mail)
-            Mobile: $userphone
-            Title: $jobtitle
-            Company: $company
-            Department: $department
-            Department number: $departmentnumber
-            DL: $dggroup
-            SG: $sggroup
-            Work place: $city
-            Office 365 License: $o365
-            Account expire date: $expire
-            Manager: $usermanager
+    Username: SIGMA\$alias
+    Email: $($usermail.mail)
+    Mobile: $userphone
+    Title: $jobtitle
+    Company: $company
+    Department: $department
+    Department number: $departmentnumber
+    DL: $dggroup
+    SG: $sggroup
+    Systemgrupp: $sgcivilgroup
+    Work place: $city
+    Office 365 License: $o365
+    Account expire date: $expire
+    Manager: $usermanager
 
-            Best Regards
-            Nexer Support
+    PX: $alias
+    PX-password: $alias
 
-            Email: support@nexergroup.com
-            Phone from Sweden: 020- 510 520
-            Phone from abroad +46 (0)10- 102 50 50   
-            Nexer phone switchboard: 020-550 550
-            "
-        }
-        else
-        {
-            $emailtext = "
-            Hi, $namn's account is now changed
+    Best Regards
+    Nexer Support
 
-            Username: SIGMA\$alias
-            Email: $($usermail.mail)
-            Mobile: $userphone
-            Title: $jobtitle
-            Company: $company
-            Department: $department
-            Department number: $departmentnumber
-            DL: $dggroup
-            SG: $sggroup
-            Work place: $city
-            Office 365 License: $o365
-            Account expire date: $expire
-            Manager: $usermanager
+    Email: support@nexergroup.com
+    Phone from Sweden: 020- 510 520
+    Phone from abroad +46 (0)10- 102 50 50   
+    Nexer phone switchboard: 020-550 550
+    "
+    }
+    elseif($company -eq "Sigma Civil AB" -and $px -like "System.Data.DataRow")
+    {$emailtext = "
+    Hi, $namn's account is now changed
 
-            PX: $alias
-            PX-password: $alias
+    Username: SIGMA\$alias
+    Email: $($usermail.mail)
+    Mobile: $userphone
+    Title: $jobtitle
+    Company: $company
+    Department: $department
+    Department number: $departmentnumber
+    DL: $dggroup
+    SG: $sggroup
+    Systemgrupp: $sgcivilgroup
+    Work place: $city
+    Office 365 License: $o365
+    Account expire date: $expire
+    Manager: $usermanager
 
-            Best Regards
-            Nexer Support
+    Best Regards
+    Nexer Support
 
-            Email: support@nexergroup.com
-            Phone from Sweden: 020- 510 520
-            Phone from abroad +46 (0)10- 102 50 50   
-            Nexer phone switchboard: 020-550 550
-            "
-        }
+    Email: support@nexergroup.com
+    Phone from Sweden: 020- 510 520
+    Phone from abroad +46 (0)10- 102 50 50   
+    Nexer phone switchboard: 020-550 550
+    "
+    }
+    elseif($px -like "System.Data.DataRow")
+    {$emailtext = "
+    Hi, $namn's account is now changed
 
-        #Send-MailMessage -From $From -To $($To.mail) -Subject $subject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
-        #Send-MailMessage -From $From -To "christian.spector@nexergroup.com" -Subject $subject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
+    Username: SIGMA\$alias
+    Email: $($usermail.mail)
+    Mobile: $userphone
+    Title: $jobtitle
+    Company: $company
+    Department: $department
+    Department number: $departmentnumber
+    DL: $dggroup
+    SG: $sggroup
+    Work place: $city
+    Office 365 License: $o365
+    Account expire date: $expire
+    Manager: $usermanager
+
+    Best Regards
+    Nexer Support
+
+    Email: support@nexergroup.com
+    Phone from Sweden: 020- 510 520
+    Phone from abroad +46 (0)10- 102 50 50   
+    Nexer phone switchboard: 020-550 550
+    "
+    }
+    else
+    {$emailtext = "
+    Hi, $namn's account is now changed
+
+    Username: SIGMA\$alias
+    Email: $($usermail.mail)
+    Mobile: $userphone
+    Title: $jobtitle
+    Company: $company
+    Department: $department
+    Department number: $departmentnumber
+    DL: $dggroup
+    SG: $sggroup
+    Work place: $city
+    Office 365 License: $o365
+    Account expire date: $expire
+    Manager: $usermanager
+
+    PX: $alias
+    PX-password: $alias
+
+    Best Regards
+    Nexer Support
+
+    Email: support@nexergroup.com
+    Phone from Sweden: 020- 510 520
+    Phone from abroad +46 (0)10- 102 50 50   
+    Nexer phone switchboard: 020-550 550
+    "
+    }
+
+    #Send-MailMessage -From $From -To $($To.mail) -Subject $subject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
+    #Send-MailMessage -From $From -To "christian.spector@nexergroup.com" -Subject $subject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
 
     }
 
@@ -478,12 +536,9 @@ param
 
     function set-account-memberof
     {
-        # Create variables where all group memberships to be added and to be removed are gathered and defined
         $AddGroups = @()
-        $RemoveGroups = @()
-
-        # Switch to match which company the user belongs to and adds the correct group to $AddGroups
         $AddGroups += switch ($company) {
+            "Danir AB"                              { "Danir Office $city" }
             "Nexer AB"                              { "ITC Office $city" }
            #"Nexer Asset Management AS"             {}
             "Nexer Asset Management Oy"             { "ITC Finland Office $city" }
@@ -505,6 +560,61 @@ param
             "Nexer Sp. z o.o."                      { "ITC Office $city" }
             "Sigma IT Polska Sp. z o.o."            { "ITC Office $city" }
             "Nexer Tech Talent AB"                  { "Young Talent Office $city" }
+            "Sigma Civil AB"                        {
+                                                        if($city -like "Stockholm")
+                                                            { "Civil Office Stockholm Liljeholmen" }
+                                                        else
+                                                            { "Civil Office $city" }
+
+                                                        foreach ($cg in $sgcivilgroup)
+                                                        {
+                                                            Get-ADUser -Identity $alias | Add-ADPrincipalGroupMembership -memberof $cg
+                                                        }
+                                                    }
+            "Sigma Connectivity AB"                 { @("og-ConnectivityAll","Connectivity SWE Office $city") }
+            "Sigma Connectivity ApS"                {
+                                                        if($city -like "Köpenhamn")
+                                                            { @("og-ConnectivityAll","Connectivity DK Office Copenhagen") }
+                                                        else
+                                                            { @("og-ConnectivityAll","Connectivity DK Office $city") }
+                                                    }
+            "Sigma Connectivity Inc."               { @("og-ConnectivityAll","Connectivity INC Office $city") }
+            "Sigma Connectivity Sp. z o.o."         { @("og-ConnectivityAll","Connectivity PL Office $city") }
+            "Sigma Connectivity Engineering AB"     { @("og-ConnectivityAll","SC Engineering Office $city") }
+            "Sigma Embedded Engineering AB"         { "Embedded Engineering Office $city" }
+            "Sigma Energy & Marine AB"              { "Energy Marine Office $city" }
+            "Sigma Energy & Marine AS"              { "Energy Marine AS Office $city" }
+            "Sigma Industry East North AB"          { "Industry East North Office $city" }
+            "Sigma Industry Evolution AB"           { "Industry Evolution Office $city" }
+           #"Sigma Industry Inc."                   { "SII Office $city" }
+            "Sigma Industry Solutions AB"            { "Industry Solutions Office $city" }
+            "Sigma Industry South AB"                { "Industry South Office $city" }
+            "Sigma Industry West AB"                 { "Industry West Office $city" }
+            "Sigma Quality & Compliance AB"          {
+                                                        if($city -like "Göteborg")
+                                                            { "QC Office Gothenburg" }
+                                                        else
+                                                            { "QC Office $city" }
+                                                    }
+            "Sigma Quality & Compliance ApS"        {
+                                                        if($city -like "Göteborg")
+                                                            { "QC Office Gothenburg" }
+                                                        else
+                                                            { "QC Office $city" }
+                                                    }
+            "aptio group Sweden AB"                 {
+                                                        if($city -eq "Göteborg")
+                                                            { "QC Office Gothenburg" }
+                                                        else
+                                                            { "QC Office $city" }
+                                                    }
+            "aptio group Denmark ApS"               {
+                                                        if($city -eq "Göteborg")
+                                                            { "QC Office Gothenburg" }
+                                                        else
+                                                            { "QC Office $city" }
+                                                    }
+           #"Sigma Software LLC"                    {}
             Default                                 { "Office $city All" }
         }
         
@@ -514,21 +624,24 @@ param
             $AddGroups += $sggroup
         }
 
+        foreach ($item in $AddGroups)
+        {
+            Get-ADGroup -Identity $item | Add-ADGroupMember -Members $alias
+        }
+
         # DG Groups
         if($dggroup -notlike "N/A")
         {
             foreach ($g in $dggroup)
             {
-                $AddGroups += $dggroup
+                Get-ADUser -Identity $alias | Add-ADPrincipalGroupMembership -memberof $g
             }
         }
 
         
         # Office365
-        # If license value passed from HR4Sigma
-        if($o365)
+        IF(($company -like "Nexer*") -OR ($company -like "Sigma IT Polska Sp. z o.o."))
         {
-            # Checks the $O365 value that has been passed from HR4Sigma. Sets the correct Security group depending on the value.
             $o365group = switch ($o365) {
                 "E1"            { "SG_Office365-E1_Nexer-CSP" }
                 "F1"            { Check-EALicense -License "F3" }
@@ -538,37 +651,43 @@ param
                 "Underkonsult"  {}
                 "UK"            {}
             }
-
-            # Gather all current 365 group memberships to be removed
-            $OldO365Groups = Get-ADPrincipalGroupMembership $alias | Where {($_.Name -match "^SG_(Microsoft|Office)365-(F|E)(1|3)_Nexer-(CSP|EA)$") -OR ($_.Name -match "^SG\sOffice365\s(F|E)(1|3)$")}
-            IF($OldO365Groups)
+        }
+        elseif (($company -like "Danir AB") -OR ($company -like "Sigma*") -OR ($company -like "aptio*")) 
+        {
+            $o365group = switch ($o365) {
+                "E1"            { "SG_Office365-E1_Sigma-CSP" }
+                "F1"            { "SG_Microsoft365-F3_Sigma-CSP" }
+                "F3"            { "SG_Microsoft365-F3_Sigma-CSP" }
+                "E3"            { "SG_Microsoft365-E3_Sigma-CSP" }
+                "Ingen licens"  {}
+                "Underkonsult"  {}
+                "UK"            {}
+            }
+        }
+        # If license value passed from HR4Sigma
+        if($o365)
+        {
+            # Remove old license groups
+            $o365member = Get-ADPrincipalGroupMembership $alias | Where {($_.Name -match "^SG_(Microsoft|Office)365-(F|E)\d_(Nexer|Sigma)-(CSP|EA)$") -OR ($_.Name -match "^SG\sOffice365\s(F|E)\d$")}
+            IF($o365member)
             {
-                # Adds the found 365 groups to $RemoveGroups to be removed from membership 
-                $RemoveGroups += $OldO365Groups
-
+                foreach ($item in $o365member)
+                {    
+                    Get-ADGroup $item | Remove-ADGroupMember -Members $alias -Confirm:$false
+                }
             }
 
-            # Checks if $o365group variable has been assigned a group name
+            # Add new license groups (If assigned)
             if ($o365group) {
-                # Add group name to $AddGroups to be added to membership
-                $AddGroups += $o365group
+                Get-ADGroup $o365group | Add-ADGroupMember -Members $alias
             }
         }
 
-
-
-        # Removes all group membership gathered in $RemoveGroups
-        foreach ($item in $RemoveGroups)
-        {
-            Get-ADGroup -Identity $item | Remove-ADGroupMember -Members $alias
-        }
-
-        # Adds all group membership gathered in $AddGroups
-        foreach ($item in $AddGroups)
-        {
-            Get-ADGroup -Identity $item | Add-ADGroupMember -Members $alias
-        }
-        
+        # No Group
+        #if($dggroup -eq "No Group" -or $sggroup -eq "No Group" -or $sgcivilgroup -eq "No Group")
+        #{
+        #    Get-ADGroup -Identity "No Group" | Remove-ADGroupMember -Members $alias -Confirm:$false
+        #}
     }
 
     function set-new-mailaddress
@@ -655,9 +774,9 @@ load-modules
 
 $date = get-date -format "yyyy-MM-dd HH:mm"
 $logdate = Get-Date -Format "yyyyMMdd"
-$log= "C:\hr4sigma\log\nexer-change_user_HR4Sigma$logdate.log"
-$logerror = "C:\hr4sigma\log\nexer-change_user_error_HR4Sigma$logdate.log"
-$loginfo = "C:\hr4sigma\log\nexer-change_user_info_HR4Sigma$logdate.log"
+$log= "C:\hr4sigma\log\change_user_HR4Sigma$logdate.log"
+$logerror = "C:\hr4sigma\log\change_user_error_HR4Sigma$logdate.log"
+$loginfo = "C:\hr4sigma\log\change_user_info_HR4Sigma$logdate.log"
 #$description = "HR4Sigma, $usermanager, $date"
 $namn = "$fornamn $efternamn" #Behövs för mail & set-new-mailaddress funktionen
 $cleanedFirstName = remove-special-letters $fornamn #Behövs för UPN
