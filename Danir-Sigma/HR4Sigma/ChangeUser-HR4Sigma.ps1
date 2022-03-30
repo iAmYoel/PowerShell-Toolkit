@@ -37,19 +37,6 @@ param
     
     function load-modules
     {
-        #Exchange
-        try
-        {
-            $exch=New-PSSession -ConnectionUri http://ss0251/powershell -ConfigurationName Microsoft.Exchange 
-            Import-PSSession $exch -AllowClobber -DisableNameChecking -ErrorAction Stop
-        }
-        catch
-        {
-            Write-Error "ERROR! Kan inte ladda Exchange Modul"
-            "$date - ERROR! Kan inte ladda Exchange Modul" | Out-File $logerror -Append
-            Break
-        }
-
         #Active Directory
         try
         {
@@ -94,12 +81,12 @@ param
         $EAGroupMembersCount = (Get-ADGroupMember -Identity $EAGroupName -Recursive).Count
     
         if ($EAGroupMembersCount -lt $MaxUsers) {
-            $AddGroup = $EAGroupName
+            $ReturnGroup = $EAGroupName
         }else {
-            $AddGroup = $CSPGroupName
+            $ReturnGroup = $CSPGroupName
         }
     
-        Return $AddGroup
+        Return $ReturnGroup
     }
 
     function unload-modules
@@ -244,8 +231,10 @@ param
 
     function log
     {
-$usermail = Get-RemoteMailbox -Identity $alias | select -expand PrimarySmtpAddress
-$userupn = Get-RemoteMailbox -Identity $alias | select -expand UserPrincipalName
+        $UserObject = Get-ADUser -Identity $alias -Properties mail
+        $usermail = $UserObject.mail
+        $userupn = $UserObject.UserPrincipalName
+        
 "Processing started (on " + $date + "):
 --------------------------------------------
 :::PARAMS:::
@@ -464,11 +453,10 @@ DATABASE: $database
 
     function return-info
     {
-        #$usermail = Get-RemoteMailbox -Identity $alias | select -expand PrimarySmtpAddress
-        #$userupn = Get-RemoteMailbox -Identity $alias | select -expand UserPrincipalName
 
-        $usermail = Get-ADUser -Identity $alias -Properties mail | select -expand mail
-        $userupn = Get-ADUser -Identity $alias -Properties UserPrincipalName | select -expand UserPrincipalName
+        $UserObject = Get-ADUser -Identity $alias -Properties mail
+        $usermail = $UserObject.mail
+        $userupn = $UserObject.UserPrincipalName
 
         Write-Output "Användarnamn;$alias UserMail;$usermail UPN;$userupn"
     }
@@ -536,7 +524,11 @@ DATABASE: $database
 
     function set-account-memberof
     {
+        # Create variables where all group memberships to be added and to be removed are gathered and defined
         $AddGroups = @()
+        $RemoveGroups = @()
+
+        # Switch to match which company the user belongs to and adds the correct group to $AddGroups
         $AddGroups += switch ($company) {
             "Danir AB"                              { "Danir Office $city" }
             "Nexer AB"                              { "ITC Office $city" }
@@ -624,70 +616,80 @@ DATABASE: $database
             $AddGroups += $sggroup
         }
 
-        foreach ($item in $AddGroups)
-        {
-            Get-ADGroup -Identity $item | Add-ADGroupMember -Members $alias
-        }
-
         # DG Groups
         if($dggroup -notlike "N/A")
         {
             foreach ($g in $dggroup)
             {
-                Get-ADUser -Identity $alias | Add-ADPrincipalGroupMembership -memberof $g
+                $AddGroups += $dggroup
             }
         }
 
         
         # Office365
-        IF(($company -like "Nexer*") -OR ($company -like "Sigma IT Polska Sp. z o.o."))
-        {
-            $o365group = switch ($o365) {
-                "E1"            { "SG_Office365-E1_Nexer-CSP" }
-                "F1"            { Check-EALicense -License "F3" }
-                "F3"            { Check-EALicense -License "F3" }
-                "E3"            { Check-EALicense -License "E3" }
-                "Ingen licens"  {}
-                "Underkonsult"  {}
-                "UK"            {}
-            }
-        }
-        elseif (($company -like "Danir AB") -OR ($company -like "Sigma*") -OR ($company -like "aptio*")) 
-        {
-            $o365group = switch ($o365) {
-                "E1"            { "SG_Office365-E1_Sigma-CSP" }
-                "F1"            { "SG_Microsoft365-F3_Sigma-CSP" }
-                "F3"            { "SG_Microsoft365-F3_Sigma-CSP" }
-                "E3"            { "SG_Microsoft365-E3_Sigma-CSP" }
-                "Ingen licens"  {}
-                "Underkonsult"  {}
-                "UK"            {}
-            }
-        }
         # If license value passed from HR4Sigma
         if($o365)
         {
-            # Remove old license groups
-            $o365member = Get-ADPrincipalGroupMembership $alias | Where {($_.Name -match "^SG_(Microsoft|Office)365-(F|E)\d_(Nexer|Sigma)-(CSP|EA)$") -OR ($_.Name -match "^SG\sOffice365\s(F|E)\d$")}
-            IF($o365member)
+            # Match Nexer companies, Sigma IT Polska is a Nexer company that hasn't been able to legally change the name.
+            IF(($company -like "Nexer*") -OR ($company -like "Sigma IT Polska Sp. z o.o."))
             {
-                foreach ($item in $o365member)
-                {    
-                    Get-ADGroup $item | Remove-ADGroupMember -Members $alias -Confirm:$false
+                # Checks the $O365 value that has been passed from HR4Sigma. Sets the correct Security group depending on the value.
+                $o365group = switch ($o365) {
+                    "E1"            { "SG_Office365-E1_Nexer-CSP" }
+                    "F1"            { Check-EALicense -License "F3" }
+                    "F3"            { Check-EALicense -License "F3" }
+                    "E3"            { Check-EALicense -License "E3" }
+                    "Ingen licens"  {}
+                    "Underkonsult"  {}
+                    "UK"            {}
                 }
             }
 
-            # Add new license groups (If assigned)
+            # Match Danir, Sigma, A Society and Aptio companies
+            elseif (($company -like "Danir*") -OR ($company -like "Sigma*") -OR ($company -like "A Society*") -OR ($company -like "Aptio*")) 
+            {
+                # Checks the $O365 value that has been passed from HR4Sigma. Sets the correct Security group depending on the value.
+                $o365group = switch ($o365) {
+                    "E1"            { "SG_Office365-E1_Sigma-CSP" }
+                    "F1"            { "SG_Microsoft365-F3_Sigma-CSP" }
+                    "F3"            { "SG_Microsoft365-F3_Sigma-CSP" }
+                    "E3"            { "SG_Microsoft365-E3_Sigma-CSP" }
+                    "Ingen licens"  {}
+                    "Underkonsult"  {}
+                    "UK"            {}
+                }
+            }
+
+            # Gather all current 365 group memberships to be removed
+            $OldO365Groups = Get-ADPrincipalGroupMembership $alias | Where {($_.Name -match "^SG_(Microsoft|Office)365-(F|E)(1|3)_(Nexer|Sigma)-(CSP|EA)$") -OR ($_.Name -match "^SG\sOffice365\s(F|E)(1|3)$")}
+            IF($OldO365Groups)
+            {
+                # Adds the found 365 groups to $RemoveGroups to be removed from membership 
+                $RemoveGroups += $OldO365Groups
+
+            }
+
+            # Checks if $o365group variable has been assigned a group name
             if ($o365group) {
-                Get-ADGroup $o365group | Add-ADGroupMember -Members $alias
+                # Add group name to $AddGroups to be added to membership
+                $AddGroups += $o365group
             }
         }
 
-        # No Group
-        #if($dggroup -eq "No Group" -or $sggroup -eq "No Group" -or $sgcivilgroup -eq "No Group")
-        #{
-        #    Get-ADGroup -Identity "No Group" | Remove-ADGroupMember -Members $alias -Confirm:$false
-        #}
+
+
+        # Removes all group membership gathered in $RemoveGroups
+        foreach ($item in $RemoveGroups)
+        {
+            Get-ADGroup -Identity $item | Remove-ADGroupMember -Members $alias
+        }
+
+        # Adds all group membership gathered in $AddGroups
+        foreach ($item in $AddGroups)
+        {
+            Get-ADGroup -Identity $item | Add-ADGroupMember -Members $alias
+        }
+        
     }
 
     function set-new-mailaddress
@@ -704,10 +706,10 @@ DATABASE: $database
             $fullName = $fornamn + " " + $efternamn
             $UPN = "$cleanedFirstName.$cleanedLastName@sigma.se"
         
-            $Mailbox = Get-RemoteMailbox -Identity $UPN -ErrorAction SilentlyContinue
-            If ($Mailbox)
+            $UPNCheck = Get-ADUser -Filter "UserPrincipalName -like '$UPN'" -ErrorAction SilentlyContinue
+            If ($UPNCheck)
             {
-                "$date - Mailbox $Mailbox exists, checking next available..." | Out-File $loginfo -Append #Returnerar DisplayName
+                "$date - UPN $UPNCheck exists, checking next available..." | Out-File $loginfo -Append #Returnerar DisplayName
                 Start-Sleep -s 2
                 $AddNumber = 1
                 Do
@@ -715,23 +717,40 @@ DATABASE: $database
                     $AddNumber++
                     $NewUPN = $cleanedFirstName + "." + $cleanedLastName + $AddNumber + "@sigma.se"
                     $NewMailAddress = $cleanedFirstName + "." + $cleanedLastName + $AddNumber # Denna används till set-new-mailaddress
-                    $NewMailbox = Get-RemoteMailbox -Identity $NewUPN -ErrorAction SilentlyContinue
-                    #Write-Debug "Mailbox: $Mailbox"
-                    #Write-Debug "UPN: $UPN"
-                    #Write-Debug "NewMailbox: $NewUPN"
-                    #Write-Debug "NewUPN: $NewUPN"
-                    #Write-Debug "Domain: $Domain"
-                    #Read-Host "OK?"
-                } Until(!$NewMailbox)
+                    $NewUPNCheck = Get-ADUser -Filter "UserPrincipalName -like '$UPN'" -ErrorAction SilentlyContinue
+                   
+                } Until(!$NewUPNCheck)
 
                 $newName = $fornamn + " " + $efternamn + $AddNumber
-                Set-RemoteMailbox -Identity $alias -name $newName -displayname $fullName -PrimarySmtpAddress "$NewMailAddress@$Domain" -EmailAddressPolicyEnabled $false -UserPrincipalName $NewUPN
-                Set-ADUser $alias -GivenName $fornamn -Surname $efternamn
+                #Set-RemoteMailbox -Identity $alias -name $newName -displayname $fullName -PrimarySmtpAddress "$NewMailAddress@$Domain" -EmailAddressPolicyEnabled $false -UserPrincipalName $NewUPN
+                Set-ADUser $alias -GivenName $fornamn -Surname $efternamn -Name $newName -DisplayName $fullName -UserPrincipalName $NewUPN
+                
+                $ProxyAddresses = (Get-ADUser $alias -Properties ProxyAddresses).ProxyAddresses | Foreach{
+                    if($_ -cmatch "^SMTP:"){
+                        "SMTP:$NewMailAddress@$Domain"
+                    }else{
+                        $_
+                    }
+                }
+
+                Set-ADUser $alias -replace @{ProxyAddresses=$ProxyAddresses}
+
             }
             else
             {
-                Set-RemoteMailbox -Identity $alias -name $fullName -displayname $fullName -PrimarySmtpAddress "$cleanedFirstName.$cleanedLastName@$Domain" -EmailAddressPolicyEnabled $false -UserPrincipalName $UPN
-                Set-ADUser $alias -GivenName $fornamn -Surname $efternamn
+                #Set-RemoteMailbox -Identity $alias -name $fullName -displayname $fullName -PrimarySmtpAddress "$cleanedFirstName.$cleanedLastName@$Domain" -EmailAddressPolicyEnabled $false -UserPrincipalName $UPN
+                Set-ADUser $alias -GivenName $fornamn -Surname $efternamn -name $fullName -DisplayName $fullName -UserPrincipalName $UPN
+
+                $ProxyAddresses = (Get-ADUser $alias -Properties ProxyAddresses).ProxyAddresses | Foreach{
+                    if($_ -cmatch "^SMTP:"){
+                        "SMTP:$cleanedFirstName.$cleanedLastName@$Domain"
+                    }else{
+                        $_
+                    }
+                }
+
+                Set-ADUser $alias -replace @{ProxyAddresses=$ProxyAddresses}
+
             }
         }
     }

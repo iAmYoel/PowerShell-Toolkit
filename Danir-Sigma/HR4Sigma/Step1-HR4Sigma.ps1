@@ -122,21 +122,6 @@ function check-values
 
 function load-modules
 {
-    #Exchange
-    try
-    {
-        $exch=New-PSSession -ConnectionUri http://ss0251/powershell -ConfigurationName Microsoft.Exchange 
-        Import-PSSession $exch -AllowClobber -DisableNameChecking -ErrorAction Stop
-    }
-    catch
-    {
-        Write-Error "ERROR! Kan inte ladda Exchange Modul"
-        "$date - ERROR! Kan inte ladda Exchange Modul" | Out-File $logerror -Append
-        $emailtext = "ERROR! Kan inte ladda Exchange Modul - $date"
-        Send-MailMessage -From $From -To $To -Subject $subject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
-        Break
-    }
-
     #Active Directory
     try
     {
