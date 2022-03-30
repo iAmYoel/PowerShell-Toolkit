@@ -574,7 +574,7 @@ Try{
         Break
     }
 }
-# Set Access Group for RDS Farm
+# Set Access Group for RDS Collection
 Try{
     Set-RDSessionCollectionConfiguration -CollectionName $DesktopCollectionName -UserGroup $RDSAccessGroup -ActiveSessionLimitMin 720 -DisconnectedSessionLimitMin 180 -IdleSessionLimitMin 180 -ConnectionBroker $DefinedCB.dNSHostName -ErrorAction Stop
     Write-LogEntry -Severity INFO -Message "Successfully configured access for the AD group $RDSAccessGroup" -PrintOutput
@@ -764,7 +764,7 @@ IF($CertFilePath){
 
 
 # Create RDS Broker DNS-Record
-$IPBroker01 = ([System.Net.Dns]::GetHostAddresses($DefinedCB.dNSHostName)| ?{$_.addressfamily -eq 'InterNetwork'})[0].IPAddressToString
+$IPBroker01 = ([System.Net.Dns]::GetHostAddresses($DefinedCB.dNSHostName)| Where{$_.addressfamily -eq 'InterNetwork'})[0].IPAddressToString
 
 Try{
     Add-DnsServerPrimaryZone -ComputerName $DomainController -Name $GatewayExternalFqdn -ReplicationScope Domain -ErrorAction Stop
