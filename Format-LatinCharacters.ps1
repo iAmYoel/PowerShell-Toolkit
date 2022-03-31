@@ -1,5 +1,6 @@
 ﻿function Format-LatinCharacters {
     param(
+        [Parameter(ValueFromPipeline)]
         [string]$String
     )
 
