@@ -34,7 +34,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 . "$RootFolder\library\Company-HR4Sigma.ps1"
 
 # Loading Modules
-    
+
     function load-modules
     {
 
@@ -159,7 +159,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
     function delete-old-groups
     {
         #Get-ADPrincipalGroupMembership $alias | select name | Where {($_.Name -like '*ITC*' -or $_.Name -like '*Civil*')} | Sort-Object name
-        $member = Get-ADPrincipalGroupMembership $alias | 
+        $member = Get-ADPrincipalGroupMembership $alias |
         Where {
         (
         $_.Name -like '*A Society*' -or `
@@ -254,13 +254,13 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
         $SMTPPort = 25
         $Username = ""
         $Encoding = [System.Text.Encoding]::UTF8
-        
+
         $From = "support@sigma.se"
         $To = Get-Email $usermanager
         $subject = "$namn's account is now changed"
         $usermail = Get-Email $alias
         $usermanagername = Get-UserManagerName
-        
+
         $px = create-px
 
         if($company -eq "Sigma Civil AB" -and $px -eq "" -or $px -eq $null)
@@ -291,7 +291,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 
             Email: support@rts.se
             Phone from Sweden: 020- 510 520
-            Phone from abroad +46 (0)10- 102 50 50   
+            Phone from abroad +46 (0)10- 102 50 50
             "
         }
         elseif($company -eq "Sigma Civil AB" -and $px -like "System.Data.DataRow")
@@ -319,7 +319,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 
             Email: support@rts.se
             Phone from Sweden: 020- 510 520
-            Phone from abroad +46 (0)10- 102 50 50   
+            Phone from abroad +46 (0)10- 102 50 50
             "
         }
         elseif($px -like "System.Data.DataRow")
@@ -346,7 +346,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 
             Email: support@rts.se
             Phone from Sweden: 020- 510 520
-            Phone from abroad +46 (0)10- 102 50 50   
+            Phone from abroad +46 (0)10- 102 50 50
             "
         }
         else
@@ -376,7 +376,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 
             Email: support@rts.se
             Phone from Sweden: 020- 510 520
-            Phone from abroad +46 (0)10- 102 50 50   
+            Phone from abroad +46 (0)10- 102 50 50
             "
         }
 
@@ -391,38 +391,15 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
     }
 
 
-    function remove-special-letters($WordToBeCleaned)
-    {
-           
-        $tmp_swename = $WordToBeCleaned.replace("ä","a")
-        $tmp_swename = $tmp_swename.replace("ö","o")
-        $tmp_swename = $tmp_swename.replace("Ä","A")
-        $tmp_swename = $tmp_swename.replace("Ö","O")
-        $tmp_swename = $tmp_swename.replace("Ø","O")
-        $tmp_swename = $tmp_swename.replace("Å","A")
-        $tmp_swename = $tmp_swename.replace("Ž","Z")
-        $tmp_swename = $tmp_swename.replace(" ","")
-        $tmp_swename = $tmp_swename.replace("´","")
-        $tmp_swename = $tmp_swename.replace("æ","ae")
-        $tmp_swename = $tmp_swename.replace("á","a")
-        $tmp_swename = $tmp_swename.replace("à","a")
-        $tmp_swename = $tmp_swename.replace("ą","a")
-        $tmp_swename = $tmp_swename.replace("é","e")
-        $tmp_swename = $tmp_swename.replace("è","e")
-        $tmp_swename = $tmp_swename.replace("ë","e")
-        $tmp_swename = $tmp_swename.replace("ł","l")
-        $tmp_swename = $tmp_swename.replace("ń","n")
-        $tmp_swename = $tmp_swename.replace("ó","o")
-        $tmp_swename = $tmp_swename.replace("ò","o")
-        $tmp_swename = $tmp_swename.replace("ø","o")
-        $tmp_swename = $tmp_swename.replace("í","i")
-        $tmp_swename = $tmp_swename.replace("ì","i")
-        $tmp_swename = $tmp_swename.replace("ç","c")
-        $tmp_swename = $tmp_swename.replace("ü","u")
-        $tmp_swename = $tmp_swename.replace("ñ","n")
-        $ettnamn = $tmp_swename.replace("å","a")
-        return $ettnamn
-       
+    # function for formatting special characters to normal and removing spaces from string
+    function Format-LatinCharacters {
+        param(
+            [Parameter(ValueFromPipeline)]
+            [string]$String
+        )
+
+        [Text.Encoding]::ASCII.GetString([Text.Encoding]::GetEncoding("Cyrillic").GetBytes($String)) -replace "\s"
+
     }
 
     function return-info
@@ -442,7 +419,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
             Set-ADAccountExpiration -Identity $alias -DateTime $null
         }
         else
-        {        
+        {
             $newexpire = [datetime]::parseexact($expire, 'yyyy-MM-dd', $null).AddDays(1).ToString('yyyy-MM-dd')
             Set-ADAccountExpiration -Identity $alias -DateTime $newexpire
         }
@@ -494,7 +471,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
                                                             { "Civil Office Stockholm Liljeholmen" }
                                                         else
                                                             { "Civil Office $city" }
-                                                        
+
                                                         foreach ($cg in $sgcivilgroup)
                                                         {
                                                             if ($cg -notlike "N/A") {
@@ -536,7 +513,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
                                                     }
             Default                                 { "Office $city All" }
         }
-        
+
         # SG Groups
         foreach ($item in $sggroup)
         {
@@ -553,7 +530,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
             }
         }
 
-        
+
         # Office365
         # If license value passed from HR4Sigma
         if($o365)
@@ -573,7 +550,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
             $OldO365Groups = Get-ADPrincipalGroupMembership $alias | Where {($_.Name -match "^SG_(Microsoft|Office)365-(F|E)(1|3)_Sigma-CSP$") -OR ($_.Name -match "^SG\sOffice365\s(F|E)(1|3)$")}
             IF($OldO365Groups)
             {
-                # Adds the found 365 groups to $RemoveGroups to be removed from membership 
+                # Adds the found 365 groups to $RemoveGroups to be removed from membership
                 $RemoveGroups += $OldO365Groups
 
             }
@@ -598,11 +575,11 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
         {
             Get-ADGroup -Identity $item | Add-ADGroupMember -Members $alias
         }
-        
+
     }
 
     function set-new-mailaddress
-    {    
+    {
         $existinguser = Get-ADUser $alias
         if ($existinguser.GivenName -eq $fornamn -and $existinguser.Surname -eq $efternamn)
         {
@@ -614,7 +591,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
         {
             $fullName = $fornamn + " " + $efternamn
             $UPN = "$cleanedFirstName.$cleanedLastName@sigma.se"
-        
+
             $UPNCheck = Get-ADUser -Filter "UserPrincipalName -like '$UPN'" -ErrorAction SilentlyContinue
             If ($UPNCheck)
             {
@@ -627,13 +604,13 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
                     $NewUPN = $cleanedFirstName + "." + $cleanedLastName + $AddNumber + "@sigma.se"
                     $NewMailAddress = $cleanedFirstName + "." + $cleanedLastName + $AddNumber # Denna används till set-new-mailaddress
                     $NewUPNCheck = Get-ADUser -Filter "UserPrincipalName -like '$UPN'" -ErrorAction SilentlyContinue
-                   
+
                 } Until(!$NewUPNCheck)
 
                 $newName = $fornamn + " " + $efternamn + $AddNumber
                 #Set-RemoteMailbox -Identity $alias -name $newName -displayname $fullName -PrimarySmtpAddress "$NewMailAddress@$Domain" -EmailAddressPolicyEnabled $false -UserPrincipalName $NewUPN
                 Set-ADUser $alias -GivenName $fornamn -Surname $efternamn -Name $newName -DisplayName $fullName -UserPrincipalName $NewUPN
-                
+
                 $ProxyAddresses = (Get-ADUser $alias -Properties ProxyAddresses).ProxyAddresses | Foreach{
                     if($_ -cmatch "^SMTP:"){
                         "SMTP:$NewMailAddress@$Domain"
@@ -665,7 +642,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
     }
 
     function set-new-name-and-cnname
-    {    
+    {
         $existinguser = Get-ADUser $alias
         if ($existinguser.GivenName -eq $fornamn -and $existinguser.Surname -eq $efternamn)
         {}
@@ -707,8 +684,8 @@ $logerror = "$RootFolder\log\change-user-error-HR4Sigma_$logdate.log"
 $loginfo = "$RootFolder\log\change-user-info-HR4Sigma_$logdate.log"
 #$description = "HR4Sigma, $usermanager, $date"
 $namn = "$fornamn $efternamn" #Behövs för mail & set-new-mailaddress funktionen
-$cleanedFirstName = remove-special-letters $fornamn #Behövs för UPN
-$cleanedLastName = remove-special-letters $efternamn #Behövs för UPN
+$cleanedFirstName = Format-LatinCharacters $fornamn #Behövs för UPN
+$cleanedLastName = Format-LatinCharacters $efternamn #Behövs för UPN
 
 # Array Fixes
 

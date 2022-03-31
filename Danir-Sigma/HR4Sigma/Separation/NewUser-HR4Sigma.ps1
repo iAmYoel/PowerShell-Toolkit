@@ -34,7 +34,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 . "$RootFolder\library\Company-HR4Sigma.ps1"
 
 # Loading Modules
-    
+
     function load-modules
     {
 
@@ -137,7 +137,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
         if (!$CNnameCheck) {$CNName = $namn}
         else
         {
-            "$date - CNName $namn exists, checking next available..." | Out-File $loginfo -Append #Returnerar DisplayName/CN Path	
+            "$date - CNName $namn exists, checking next available..." | Out-File $loginfo -Append #Returnerar DisplayName/CN Path
             $AddNumber = 1
 	        Do
             {
@@ -162,11 +162,11 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
                 $CNName = $namn + $AddNumber
                 $UPN = $cleanedFirstName + "." + $cleanedLastName + $AddNumber + "@sigma.se"
                 $MailAddress = $cleanedFirstName + "." + $cleanedLastName + $AddNumber # Denna används till New-ADUser -EmailAddress och Set-ADUser -ProxyAddresses
-        
+
                 $NewCNNameCheck = Get-ADUser -Filter "cn -like '$CNName'"
 		        $NewUPNCheck = Get-ADUser -Filter "UserPrincipalName -like '$UPN'" -ErrorAction SilentlyContinue
 	        } Until(!$NewCNNameCheck -and !$NewMailboxCheck)
-    		
+
             "$date - New CNName $CNName, New UPN $UPN" | Out-File $loginfo -Append
 
         }
@@ -191,9 +191,9 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 
     function Generate-Password
     {
-        function Get-RandomCharacters($length, $characters) { 
-        $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.length } 
-        $private:ofs="" 
+        function Get-RandomCharacters($length, $characters) {
+        $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.length }
+        $private:ofs=""
         return [String]$characters[$random]
         }
 
@@ -242,7 +242,7 @@ Inget SMS med lösenord kan skickats till chef.
             $phone = $phone -replace '\(',''
             $phone = $phone -replace '\)',''
             }
-        
+
             return $phone
         }
         catch
@@ -281,7 +281,7 @@ Inget SMS med lösenord har skickats till användaren.
             $phone = $phone -replace '\(',''
             $phone = $phone -replace '\)',''
             }
-        
+
             return $phone
         }
         catch
@@ -289,7 +289,7 @@ Inget SMS med lösenord har skickats till användaren.
             Write-Error "
 Mobilnummer kunde inte hittas för andvändare: $alias.
 Inget SMS med lösenord har skickats till användaren.
-"            
+"
 "2. Mobilnummer saknas för andvändare: $alias.
 Inget SMS har skickats till användaren." | Out-File $logsmserror -Append
         }
@@ -344,18 +344,18 @@ DATABASE: $database
 
     function mail #tidigare funktion
     {
-    
+
     $SMTPServer = "smtprelay.net.sigma.se"
     $SMTPPort = 25
     $Username = ""
     $Encoding = [System.Text.Encoding]::UTF8
-    
+
     $From = "support@sigma.se"
     $To = Get-Email $usermanager
     $subject = "$namn's account is now created"
     $usermail = Get-Email $alias
     $usermanagername = Get-UserManagerName $usermanager
-        
+
     if($company -eq "Sigma Civil AB")
     {$emailtext = "
     Hi, $namn's account is now created
@@ -383,7 +383,7 @@ DATABASE: $database
 
     Email: support@rts.se
     Phone from Sweden: 020- 510 520
-    Phone from abroad +46 (0)10- 102 50 50   
+    Phone from abroad +46 (0)10- 102 50 50
     "
     }
     else
@@ -412,7 +412,7 @@ DATABASE: $database
 
     Email: support@rts.se
     Phone from Sweden: 020- 510 520
-    Phone from abroad +46 (0)10- 102 50 50   
+    Phone from abroad +46 (0)10- 102 50 50
     "
     }
 
@@ -422,38 +422,15 @@ DATABASE: $database
     }
 
 
-    function remove-special-letters($WordToBeCleaned)
-    {
-           
-        $tmp_swename = $WordToBeCleaned.replace("ä","a")
-        $tmp_swename = $tmp_swename.replace("ö","o")
-        $tmp_swename = $tmp_swename.replace("Ä","A")
-        $tmp_swename = $tmp_swename.replace("Ö","O")
-        $tmp_swename = $tmp_swename.replace("Ø","O")
-        $tmp_swename = $tmp_swename.replace("Å","A")
-        $tmp_swename = $tmp_swename.replace("Ž","Z")
-        $tmp_swename = $tmp_swename.replace(" ","")
-        $tmp_swename = $tmp_swename.replace("´","")
-        $tmp_swename = $tmp_swename.replace("æ","ae")
-        $tmp_swename = $tmp_swename.replace("á","a")
-        $tmp_swename = $tmp_swename.replace("à","a")
-        $tmp_swename = $tmp_swename.replace("ą","a")
-        $tmp_swename = $tmp_swename.replace("é","e")
-        $tmp_swename = $tmp_swename.replace("è","e")
-        $tmp_swename = $tmp_swename.replace("ë","e")
-        $tmp_swename = $tmp_swename.replace("ł","l")
-        $tmp_swename = $tmp_swename.replace("ń","n")
-        $tmp_swename = $tmp_swename.replace("ó","o")
-        $tmp_swename = $tmp_swename.replace("ò","o")
-        $tmp_swename = $tmp_swename.replace("ø","o")
-        $tmp_swename = $tmp_swename.replace("í","i")
-        $tmp_swename = $tmp_swename.replace("ì","i")
-        $tmp_swename = $tmp_swename.replace("ç","c")
-        $tmp_swename = $tmp_swename.replace("ü","u")
-        $tmp_swename = $tmp_swename.replace("ñ","n")
-        $ettnamn = $tmp_swename.replace("å","a")
-        return $ettnamn
-       
+    # function for formatting special characters to normal and removing spaces from string
+    function Format-LatinCharacters {
+        param(
+            [Parameter(ValueFromPipeline)]
+            [string]$String
+        )
+
+        [Text.Encoding]::ASCII.GetString([Text.Encoding]::GetEncoding("Cyrillic").GetBytes($String)) -replace "\s"
+
     }
 
     function return-info
@@ -525,7 +502,7 @@ DATABASE: $database
                                                             { "Civil Office Stockholm Liljeholmen" }
                                                         else
                                                             { "Civil Office $city" }
-                                                        
+
                                                         foreach ($cg in $sgcivilgroup)
                                                         {
                                                             if ($cg -notlike "N/A") {
@@ -579,7 +556,7 @@ DATABASE: $database
            #"Sigma Software LLC"                    {}
             Default                                 { "Office $city All" }
         }
-        
+
         # SG Groups
         foreach ($item in $sggroup)
         {
@@ -595,8 +572,8 @@ DATABASE: $database
                 $AddGroups += $item
             }
         }
-        
-        
+
+
         # Office365
         # If license value passed from HR4Sigma
         if($o365)
@@ -625,16 +602,16 @@ DATABASE: $database
         {
             Get-ADGroup -Identity $item | Add-ADGroupMember -Members $alias
         }
-    
+
     }
 
 
 
 
-    
+
     function sms-and-mail
     {
-        
+
         $SMTPServer = "smtprelay.net.sigma.se"
         $SMTPPort = 25
         $SMSSubject = " "
@@ -646,7 +623,7 @@ DATABASE: $database
         # SMS
 
         $nr = Get-PhoneNumber-Manager
-        
+
         if($nr){
             $Recipient = $nr + "@qlnk.se"
             $SMStext =
@@ -658,14 +635,14 @@ DATABASE: $database
         else{
             $nonr = "No Number"
             }
-   
+
 
         # Mail
 
         $To = Get-Email $usermanager
         $usermail = Get-Email $alias
         $usermanagername = Get-UserManagerName
-            
+
         if($company -eq "Sigma Civil AB" -and $nonr){
             $emailtext = "
     Hi, $namn's account is now created
@@ -797,9 +774,9 @@ DATABASE: $database
         $From = "support@sigma.se"
         $SMSSubject = " "
         $Encoding = [System.Text.Encoding]::UTF8
-        
+
         $nr = Get-PhoneNumber-Manager $usermanager
-        
+
         if($nr){
             $Recipient = $nr + "@qlnk.se"
             $smstext =
@@ -811,7 +788,7 @@ DATABASE: $database
     }
 
 ############################################################################
- 
+
 # Load modules
 
 load-modules
@@ -829,8 +806,8 @@ $description = "HR4Sigma"
 $namn = "$fornamn $efternamn" #Behövs för mail functionen
 $pwd = Generate-Password
 $pw = ConvertTo-SecureString -string $pwd -asPlainText -Force
-$cleanedFirstName = remove-special-letters $fornamn  #Behövs för UPN
-$cleanedLastName = remove-special-letters $efternamn #Behövs för UPN
+$cleanedFirstName = Format-LatinCharacters $fornamn  #Behövs för UPN
+$cleanedLastName = Format-LatinCharacters $efternamn #Behövs för UPN
 
 # Array Fixes
 
@@ -857,7 +834,7 @@ set-account-expire
 create-px
 
 Start-Sleep -Seconds 10 # För att den ska få tid att plocka upp rätt E-post
-        
+
 #mail
 #sms-with-password
 sms-and-mail
