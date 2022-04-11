@@ -43,7 +43,7 @@ function check-user
         . $PSScriptRoot\NewUser-HR4Sigma.ps1 -alias $alias -fornamn $fornamn -efternamn $efternamn -userphone $userphone -jobtitle $jobtitle -usermanager $usermanager -company $company -department $department -departmentnumber $departmentnumber -dggroup $dggroup -sggroup $sggroup -sgcivilgroup $sgcivilgroup -street $street -city $city -country $countryprefix -o365 $o365 -expire $expire -companyid $companyid
     }
 }
-    
+
 function check-values
 {
     if ([string]::IsNullOrWhiteSpace($alias))
@@ -102,21 +102,9 @@ function check-values
     {
         "$date - Expire Empty. Alias:$alias" | Out-File $loginfo -Append
     }
-    if ([string]::IsNullOrWhiteSpace($cinodeactive))
-    {
-        "$date - Expire Empty. Alias:$alias" | Out-File $loginfo -Append
-    }
     if ([string]::IsNullOrWhiteSpace($companyid))
     {
-        "$date - Expire Empty. Alias:$alias" | Out-File $loginfo -Append
-    }
-    if ([string]::IsNullOrWhiteSpace($cunumber))
-    {
-        "$date - Expire Empty. Alias:$alias" | Out-File $loginfo -Append
-    }
-    if ([string]::IsNullOrWhiteSpace($cuname))
-    {
-        "$date - Expire Empty. Alias:$alias" | Out-File $loginfo -Append
+        "$date - CompanyID Empty. Alias:$alias" | Out-File $loginfo -Append
     }
 }
 
@@ -181,7 +169,7 @@ $From = "support@sigma.se"
 $To = "monitor-sd@sigma.se"
 
 # RUN
-    
+
 load-modules
 check-values
 $countryprefix = convert-country $country

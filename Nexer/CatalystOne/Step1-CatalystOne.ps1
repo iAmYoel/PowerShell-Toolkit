@@ -45,7 +45,7 @@ function check-user
         . $PSScriptRoot\NewUser-CatalystOne.ps1 -alias $alias -fornamn $fornamn -efternamn $efternamn -userphone $userphone -jobtitle $jobtitle -usermanager $usermanager -company $company -department $department -departmentnumber $departmentnumber -dggroup $dggroup -sggroup $sggroup -street $street -city $city -country $countryprefix -o365 $o365 -expire $expire -cinodeactive $cinodeactive -companyid $companyid -cunumber $cunumber -cuname $cuname
     }
 }
-    
+
 function check-values
 {
     if ([string]::IsNullOrWhiteSpace($alias))
@@ -106,19 +106,19 @@ function check-values
     }
     if ([string]::IsNullOrWhiteSpace($cinodeactive))
     {
-        "$date - Expire Empty. Alias:$alias" | Out-File $loginfo -Append
+        "$date - cinodeactive Empty. Alias:$alias" | Out-File $loginfo -Append
     }
     if ([string]::IsNullOrWhiteSpace($companyid))
     {
-        "$date - Expire Empty. Alias:$alias" | Out-File $loginfo -Append
+        "$date - companyid Empty. Alias:$alias" | Out-File $loginfo -Append
     }
     if ([string]::IsNullOrWhiteSpace($cunumber))
     {
-        "$date - Expire Empty. Alias:$alias" | Out-File $loginfo -Append
+        "$date - cunumber Empty. Alias:$alias" | Out-File $loginfo -Append
     }
     if ([string]::IsNullOrWhiteSpace($cuname))
     {
-        "$date - Expire Empty. Alias:$alias" | Out-File $loginfo -Append
+        "$date - cuname Empty. Alias:$alias" | Out-File $loginfo -Append
     }
 }
 
@@ -183,7 +183,7 @@ $From = "support@nexergroup.com"
 $To = "monitor-sd@sigma.se"
 
 # RUN
-    
+
 load-modules
 check-values
 $countryprefix = convert-country $country
