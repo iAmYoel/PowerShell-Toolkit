@@ -418,27 +418,26 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 
         # Switch to match which company the user belongs to and adds the correct group to $AddGroups
         $AddGroups += switch ($company) {
-            "Nexer AB"                              { "ITC Office $city" }
+            "Nexer AB"                              { "Nexer SWE Office $city" }
            #"Nexer Asset Management AS"             {}
             "Nexer Asset Management Oy"             { "Asset Management FIN Office $city" }
-            "Nexer Cybersecurity AB"                { "Cybersecurity Office $city" }
-            "Sigma Cybersecurity AB"                { "Cybersecurity Office $city" }
-            "Nexer Digital Ltd"                     { "ITC UK Office $city" }
-            "Nexer Enterprise Applications AB"      { "Dynamics Office $city" }
-            "Nexer Enterprise Applications Inc"     { "Enterprise Applications Inc Office $city" }
-            "Nexer Enterprise Applications Ltd"     { "Enterprise Applications Ltd Office $city" }
-            "Nexer Enterprise Applications Prv Ltd" { "Enterprise Applications India Office $city" }
-            "Nexer Infrastructure AB"               { "IT Tech Office $city" }
-            "Nexer Insight AB"                      { "IoT AI Office $city" }
-            "Nexer Insight Inc"                     { "ITC Office $city" }
-            "Nexer Insight Ltd"                     { "ITC Insight Ltd Office $city" }
-            "Nexer Insight Sp. z o.o."              { "ITC Insight Poland Office $city" }
-            "Nexer IT Services AB"                  { "NITS Office $city" }
-            "Nexer Prv Ltd"                         { "ITC Office $city" }
-            "Nexer Recruit AB"                      { "Recruit Office $city" }
-            "Nexer Sp. z o.o."                      { "ITC Office $city" }
+            "Nexer Cybersecurity AB"                { "Cybersecurity SWE Office $city" }
+            "Nexer Digital Ltd"                     { "Digital GBR Office $city" }
+            "Nexer Enterprise Applications AB"      { "Enterprise Applications SWE Office $city" }
+            "Nexer Enterprise Applications Inc"     { "Enterprise Applications Inc Office $city" }      # No existing active user found with this company name, is this an old company that can be deleted?
+            "Nexer Enterprise Applications Ltd"     { "Enterprise Applications GBR Office $city" }
+            "Nexer Enterprise Applications Prv Ltd" { "Enterprise Applications IND Office $city" }
+            "Nexer Infrastructure AB"               { "Infrastructure SWE Office $city" }
+            "Nexer Insight AB"                      { "Insight SWE Office $city" }
+            "Nexer Insight Inc"                     { "Insight SWE Office $city" }
+            "Nexer Insight Ltd"                     { "Insight GBR Office $city" }
+            "Nexer Insight Sp. z o.o."              { "Insight POL Office $city" }
+           #"Nexer IT Services AB"                  { "NITS Office $city" }
+            "Nexer Prv Ltd"                         { "Nexer IND Office $city" }
+            "Nexer Recruit AB"                      { "Recruit SWE Office $city" }
+            "Nexer Sp. z o.o."                      { "ITC Office $city" }                              # No existing active user found with this company name, is this an old company that can be deleted?
             "Sigma IT Polska Sp. z o.o."            { "ITC Office $city" }
-            "Nexer Tech Talent AB"                  { "Young Talent Office $city" }
+            "Nexer Tech Talent AB"                  { "Tech Talent SWE Office $city" }
             Default                                 { "Office $city All" }
         }
 
