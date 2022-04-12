@@ -5,8 +5,6 @@
 
     ## Sigma (Old/Temp)
     "Sigma Cybersecurity AB"            = @{"OU" = "OU=Users,OU=Sigma Cybersecurity,OU=SigmaGroup,DC=sigma,DC=local";           "Domain" = "sigma.se";    "Database" = "S408"};
-    "Sigma IT Polska Sp. z o.o."        = @{"OU" = "OU=Users,OU=Sigma IT Consulting Poland,OU=SigmaGroup,DC=sigma,DC=local";    "Domain" = "sigma.se";    "Database" = "SITCPOL"};
-
 
     ## Sigma
     "Sigma Civil AB"                    = @{"OU" = "OU=Users,OU=Sigma Civil,OU=SigmaGroup,DC=Sigma,DC=Local";                                                  "Domain" = "sigma.se";              "Database" = "SCIV"};
