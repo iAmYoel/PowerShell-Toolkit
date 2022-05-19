@@ -1,13 +1,14 @@
 ﻿$ListOfCompanys = @{}
 
     $ListOfCompanys["select"] = @{
-    "Danir AB"                              = @{"OU" = "OU=Users,OU=Danir,OU=SigmaGroup,DC=Sigma,DC=Local";                                              "Domain" = "danir.com";                 "Database" = "DAB"};
+    "Danir AB"                          = @{"OU" = "OU=Users,OU=Danir,OU=SigmaGroup,DC=Sigma,DC=Local";                                                        "Domain" = "danir.com";             "Database" = "DAB"};
 
     ## Sigma (Old/Temp)
-    "Sigma Cybersecurity AB"            = @{"OU" = "OU=Users,OU=Sigma Cybersecurity,OU=SigmaGroup,DC=sigma,DC=local";           "Domain" = "sigma.se";    "Database" = "S408"};
+    "Sigma Cybersecurity AB"            = @{"OU" = "OU=Users,OU=Sigma Cybersecurity,OU=SigmaGroup,DC=sigma,DC=local";                                          "Domain" = "sigma.se";              "Database" = "S408"};
 
     ## Sigma
     "Sigma Civil AB"                    = @{"OU" = "OU=Users,OU=Sigma Civil,OU=SigmaGroup,DC=Sigma,DC=Local";                                                  "Domain" = "sigma.se";              "Database" = "SCIV"};
+    "Sigma Civil Öst AB"                = @{"OU" = "OU=Users,OU=Civil Öst,OU=Sigma Civil,OU=SigmaGroup,DC=sigma,DC=local";                                     "Domain" = "sigma.se";              "Database" = "SCIVO"};
     "Sigma Connectivity AB"             = @{"OU" = "OU=Users,OU=Sigma Connectivity,OU=SigmaGroup,DC=sigma,DC=local";                                           "Domain" = "sigmaconnectivity.se";  "Database" = ""};
     "Sigma Connectivity ApS"            = @{"OU" = "OU=Users,OU=Connectivity ApS,OU=Sigma Connectivity,OU=SigmaGroup,DC=sigma,DC=local";                       "Domain" = "sigmaconnectivity.com"; "Database" = ""};
     "Sigma Connectivity Engineering AB" = @{"OU" = "OU=Users,OU=Connectivity Engineering,OU=Sigma Connectivity,OU=SigmaGroup,DC=sigma,DC=local";               "Domain" = "sigma.se";              "Database" = "SCE"};

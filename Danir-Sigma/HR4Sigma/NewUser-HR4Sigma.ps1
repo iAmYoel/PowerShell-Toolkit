@@ -356,8 +356,7 @@ DATABASE: $database
     $usermail = Get-Email $alias
     $usermanagername = Get-UserManagerName $usermanager
 
-    if($company -eq "Sigma Civil AB")
-    {$emailtext = "
+    $emailtext = "
     Hi, $namn's account is now created
 
     Username: SIGMA\$alias
@@ -370,8 +369,13 @@ DATABASE: $database
     Department number: $departmentnumber
     DL: $dggroup
     SG: $sggroup
-    Systemgrupp: $sgcivilgroup
-    Work place: $city
+    $(
+        if(($company -eq "Sigma Civil AB") -OR ($company -eq "Sigma Civil Öst AB")){
+            "Systemgrupp: $sgcivilgroup"
+            "`n   "
+        }
+        "Work place: $city"
+    )
     Office 365 License: $o365
     Account expire date: $expire
 
@@ -385,36 +389,6 @@ DATABASE: $database
     Phone from Sweden: 020- 510 520
     Phone from abroad +46 (0)10- 102 50 50
     "
-    }
-    else
-    {$emailtext = "
-    Hi, $namn's account is now created
-
-    Username: SIGMA\$alias
-    Password: Sent to manager $($usermanagername.displayname)
-    Email: $usermail
-    Mobile: $userphone
-    Title: $jobtitle
-    Company: $company
-    Department: $department
-    Department number: $departmentnumber
-    DL: $dggroup
-    SG: $sggroup
-    Work place: $city
-    Office 365 License: $o365
-    Account expire date: $expire
-
-    PX: $alias
-    PX-password: $alias
-
-    Best Regards
-    Sigma Support
-
-    Email: support@rts.se
-    Phone from Sweden: 020- 510 520
-    Phone from abroad +46 (0)10- 102 50 50
-    "
-    }
 
     Send-MailMessage -From $From -To $To -Subject $subject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
 
@@ -501,6 +475,22 @@ DATABASE: $database
                                                             { "Civil Office Stockholm Liljeholmen" }
                                                         else
                                                             { "Civil Office $city" }
+
+                                                        foreach ($cg in $sgcivilgroup)
+                                                        {
+                                                            if ($cg -notlike "N/A") {
+                                                                $cg
+                                                            }
+                                                        }
+                                                    }
+            "Sigma Civil Öst AB"                    {
+                                                        <# - Väntar på svar från kund office stokcholmsgruppen ska heta Stockholm Lilje holmen som för Sigma Civil AB
+                                                        if($city -like "Stockholm")
+                                                            { "Civil Öst Office Stockholm Liljeholmen" }
+                                                        else
+                                                            { "Civil Öst Office $city" }
+                                                        #>
+                                                        "Civil Öst Office $city" # Ta bort denna rad om den utkommenterade if-satsen ovan blir aktuell
 
                                                         foreach ($cg in $sgcivilgroup)
                                                         {
@@ -642,127 +632,48 @@ DATABASE: $database
         $usermail = Get-Email $alias
         $usermanagername = Get-UserManagerName
 
-        if($company -eq "Sigma Civil AB" -and $nonr){
-            $emailtext = "
-    Hi, $namn's account is now created
-
-    Username: SIGMA\$alias
-    Password: Manager or phone number missing, no password has been sent!
-    Email: $usermail
-    Mobile: $userphone
-    Title: $jobtitle
-    Company: $company
-    Department: $department
-    Department number: $departmentnumber
-    DL: $dggroup
-    SG: $sggroup
-    Systemgrupp: $sgcivilgroup
-    Work place: $city
-    Office 365 License: $o365
-    Account expire date: $expire
-
-    PX: $alias
-    PX-password: $alias
-
-    Best Regards
-    Sigma Support
-
-    Email: support@rts.se
-    Phone from Sweden: 020- 510 520
-    Phone from abroad +46 (0)10- 102 50 50
-    "
-        }
-        elseif($company -eq "Sigma Civil AB"){
-            $emailtext = "
-    Hi, $namn's account is now created
-
-    Username: SIGMA\$alias
-    Password: Sent to manager $($usermanagername.displayname)
-    Email: $usermail
-    Mobile: $userphone
-    Title: $jobtitle
-    Company: $company
-    Department: $department
-    Department number: $departmentnumber
-    DL: $dggroup
-    SG: $sggroup
-    Systemgrupp: $sgcivilgroup
-    Work place: $city
-    Office 365 License: $o365
-    Account expire date: $expire
-
-    PX: $alias
-    PX-password: $alias
-
-    Best Regards
-    Sigma Support
-
-    Email: support@rts.se
-    Phone from Sweden: 020- 510 520
-    Phone from abroad +46 (0)10- 102 50 50
-    "
-        }
-        if($company -ne "Sigma Civil AB" -and $nonr){
-            $emailtext = "
-    Hi, $namn's account is now created
-
-    Username: SIGMA\$alias
-    Password: Manager or phone number missing, no password has been sent!
-    Email: $usermail
-    Mobile: $userphone
-    Title: $jobtitle
-    Company: $company
-    Department: $department
-    Department number: $departmentnumber
-    DL: $dggroup
-    SG: $sggroup
-    Work place: $city
-    Office 365 License: $o365
-    Account expire date: $expire
-
-    PX: $alias
-    PX-password: $alias
-
-    Best Regards
-    Sigma Support
-
-    Email: support@rts.se
-    Phone from Sweden: 020- 510 520
-    Phone from abroad +46 (0)10- 102 50 50
-    "
-        }
-        elseif($company -ne "Sigma Civil AB"){
         $emailtext = "
-        Hi, $namn's account is now created
+    Hi, $namn's account is now created
 
-        Username: SIGMA\$alias
-        Password: Sent to manager $($usermanagername.displayname)
-        Email: $usermail
-        Mobile: $userphone
-        Title: $jobtitle
-        Company: $company
-        Department: $department
-        Department number: $departmentnumber
-        DL: $dggroup
-        SG: $sggroup
-        Work place: $city
-        Office 365 License: $o365
-        Account expire date: $expire
-
-        PX: $alias
-        PX-password: $alias
-
-        Best Regards
-        Sigma Support
-
-        Email: support@rts.se
-        Phone from Sweden: 020- 510 520
-        Phone from abroad +46 (0)10- 102 50 50
-        "
+    Username: SIGMA\$alias
+    $(
+        "Password: "
+        if($nonr){
+            "Manager or phone number missing, no password has been sent!"
+        }else{
+            "Sent to manager $($usermanagername.displayname)"
         }
+    )
+    Email: $usermail
+    Mobile: $userphone
+    Title: $jobtitle
+    Company: $company
+    Department: $department
+    Department number: $departmentnumber
+    DL: $dggroup
+    SG: $sggroup
+    $(
+        if(($company -eq "Sigma Civil AB") -OR ($company -eq "Sigma Civil Öst AB")){
+            "Systemgrupp: $sgcivilgroup"
+            "`n   " # New line and indentation before the "Work place" line
+        }
+        "Work place: $city"
+    )
+    Office 365 License: $o365
+    Account expire date: $expire
+
+    PX: $alias
+    PX-password: $alias
+
+    Best Regards
+    Sigma Support
+
+    Email: support@rts.se
+    Phone from Sweden: 020- 510 520
+    Phone from abroad +46 (0)10- 102 50 50
+    "
 
         Send-MailMessage -From $MailFrom -To $To -Subject $MailSubject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
-        Send-MailMessage -From $MailFrom -To "christian.spector@nexergroup.com" -Subject $MailSubject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
 
     }
 

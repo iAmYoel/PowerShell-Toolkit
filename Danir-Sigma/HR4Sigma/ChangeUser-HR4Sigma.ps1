@@ -263,122 +263,44 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 
         $px = create-px
 
-        if($company -eq "Sigma Civil AB" -and $px -eq "" -or $px -eq $null)
-        {
-            $emailtext = "
-            Hi, $namn's account is now changed
+        $emailtext = "
+        Hi, $namn's account is now changed
 
-            Username: SIGMA\$alias
-            Email: $($usermail.mail)
-            Mobile: $userphone
-            Title: $jobtitle
-            Company: $company
-            Department: $department
-            Department number: $departmentnumber
-            DL: $dggroup
-            SG: $sggroup
-            Systemgrupp: $sgcivilgroup
-            Work place: $city
-            Office 365 License: $o365
-            Account expire date: $expire
-            Manager: $usermanager
+        Username: SIGMA\$alias
+        Email: $($usermail.mail)
+        Mobile: $userphone
+        Title: $jobtitle
+        Company: $company
+        Department: $department
+        Department number: $departmentnumber
+        DL: $dggroup
+        SG: $sggroup
+        $(
+            if(($company -eq "Sigma Civil AB") -OR ($company -eq "Sigma Civil Öst AB")){
+                "Systemgrupp: $sgcivilgroup"
+                "`n   " # New line and indentation before the "Work place" line
+            }
+            "Work place: $city"
+        )
+        Office 365 License: $o365
+        Account expire date: $expire
+        Manager: $usermanager
+        $(
+            if ($px -notlike "System.Data.DataRow") {
+                "`n   " # New line and indentation
+                "PX: $alias"
+                "`n   " # New line and indentation
+                "PX-password: $alias"
+                "`n   " # New line and indentation
+            }
+        )
+        Best Regards
+        Sigma Support
 
-            PX: $alias
-            PX-password: $alias
-
-            Best Regards
-            Sigma Support
-
-            Email: support@rts.se
-            Phone from Sweden: 020- 510 520
-            Phone from abroad +46 (0)10- 102 50 50
-            "
-        }
-        elseif($company -eq "Sigma Civil AB" -and $px -like "System.Data.DataRow")
-        {
-            $emailtext = "
-            Hi, $namn's account is now changed
-
-            Username: SIGMA\$alias
-            Email: $($usermail.mail)
-            Mobile: $userphone
-            Title: $jobtitle
-            Company: $company
-            Department: $department
-            Department number: $departmentnumber
-            DL: $dggroup
-            SG: $sggroup
-            Systemgrupp: $sgcivilgroup
-            Work place: $city
-            Office 365 License: $o365
-            Account expire date: $expire
-            Manager: $usermanager
-
-            Best Regards
-            Sigma Support
-
-            Email: support@rts.se
-            Phone from Sweden: 020- 510 520
-            Phone from abroad +46 (0)10- 102 50 50
-            "
-        }
-        elseif($px -like "System.Data.DataRow")
-        {
-            $emailtext = "
-            Hi, $namn's account is now changed
-
-            Username: SIGMA\$alias
-            Email: $($usermail.mail)
-            Mobile: $userphone
-            Title: $jobtitle
-            Company: $company
-            Department: $department
-            Department number: $departmentnumber
-            DL: $dggroup
-            SG: $sggroup
-            Work place: $city
-            Office 365 License: $o365
-            Account expire date: $expire
-            Manager: $usermanager
-
-            Best Regards
-            Sigma Support
-
-            Email: support@rts.se
-            Phone from Sweden: 020- 510 520
-            Phone from abroad +46 (0)10- 102 50 50
-            "
-        }
-        else
-        {
-            $emailtext = "
-            Hi, $namn's account is now changed
-
-            Username: SIGMA\$alias
-            Email: $($usermail.mail)
-            Mobile: $userphone
-            Title: $jobtitle
-            Company: $company
-            Department: $department
-            Department number: $departmentnumber
-            DL: $dggroup
-            SG: $sggroup
-            Work place: $city
-            Office 365 License: $o365
-            Account expire date: $expire
-            Manager: $usermanager
-
-            PX: $alias
-            PX-password: $alias
-
-            Best Regards
-            Sigma Support
-
-            Email: support@rts.se
-            Phone from Sweden: 020- 510 520
-            Phone from abroad +46 (0)10- 102 50 50
-            "
-        }
+        Email: support@rts.se
+        Phone from Sweden: 020- 510 520
+        Phone from abroad +46 (0)10- 102 50 50
+        "
 
         #Send-MailMessage -From $From -To $($To.mail) -Subject $subject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
         #Send-MailMessage -From $From -To "christian.spector@nexergroup.com" -Subject $subject -Body $emailtext -SmtpServer $SMTPServer -Port $SMTPPort -Encoding $Encoding
@@ -471,6 +393,22 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
                                                             { "Civil Office Stockholm Liljeholmen" }
                                                         else
                                                             { "Civil Office $city" }
+
+                                                        foreach ($cg in $sgcivilgroup)
+                                                        {
+                                                            if ($cg -notlike "N/A") {
+                                                                $cg
+                                                            }
+                                                        }
+                                                    }
+            "Sigma Civil Öst AB"                    {
+                                                        <# - Väntar på svar från kund office stokcholmsgruppen ska heta Stockholm Lilje holmen som för Sigma Civil AB
+                                                        if($city -like "Stockholm")
+                                                            { "Civil Öst Office Stockholm Liljeholmen" }
+                                                        else
+                                                            { "Civil Öst Office $city" }
+                                                        #>
+                                                        "Civil Öst Office $city" # Ta bort denna rad om den utkommenterade if-satsen ovan blir aktuell
 
                                                         foreach ($cg in $sgcivilgroup)
                                                         {
