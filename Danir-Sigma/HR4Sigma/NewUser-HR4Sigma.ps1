@@ -484,13 +484,10 @@ DATABASE: $database
                                                         }
                                                     }
             "Sigma Civil Öst AB"                    {
-                                                        <# - Väntar på svar från kund office stokcholmsgruppen ska heta Stockholm Lilje holmen som för Sigma Civil AB
-                                                        if($city -like "Stockholm")
+                                                        if($city -like "Stockholm Liljeholmen")
                                                             { "Civil Öst Office Stockholm Liljeholmen" }
                                                         else
                                                             { "Civil Öst Office $city" }
-                                                        #>
-                                                        "Civil Öst Office $city" # Ta bort denna rad om den utkommenterade if-satsen ovan blir aktuell
 
                                                         foreach ($cg in $sgcivilgroup)
                                                         {
