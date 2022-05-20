@@ -402,10 +402,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
                                                         }
                                                     }
             "Sigma Civil Öst AB"                    {
-                                                        if($city -like "Stockholm Liljeholmen")
-                                                            { "Civil Öst Office Stockholm Liljeholmen" }
-                                                        else
-                                                            { "Civil Öst Office $city" }
+                                                        "Civil Öst Office $city"
 
                                                         foreach ($cg in $sgcivilgroup)
                                                         {
