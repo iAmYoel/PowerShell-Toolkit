@@ -23,6 +23,7 @@
     "Sigma Industry Solutions AB"       = @{"OU" = "OU=Users,OU=Solutions,OU=Sigma Industry,OU=SigmaGroup,DC=Sigma,DC=Local";                                  "Domain" = "sigma.se";              "Database" = "SSOL"};
     "Sigma Industry South AB"           = @{"OU" = "OU=Users,OU=South,OU=Sigma Industry,OU=SigmaGroup,DC=Sigma,DC=Local";                                      "Domain" = "sigma.se";              "Database" = "SISO"};
     "Sigma Industry West AB"            = @{"OU" = "OU=Users,OU=West,OU=Sigma Industry,OU=SigmaGroup,DC=Sigma,DC=Local";                                       "Domain" = "sigma.se";              "Database" = "SIW"};
+    "Crew by Sigma AB"                  = @{"OU" = "OU=Users,OU=Crew by Sigma AB,OU=West,OU=Sigma Industry,OU=SigmaGroup,DC=sigma,DC=local";                   "Domain" = "sigma.se";              "Database" = ""};
     "Sigma Quality & Compliance AB"     = @{"OU" = "OU=Users,OU=Sigma Quality & Compliance,OU=SigmaGroup,DC=Sigma,DC=Local";                                   "Domain" = "sigma.se";              "Database" = "SQC"};
     "aptio group Sweden AB"             = @{"OU" = "OU=Users,OU=Sigma Quality & Compliance,OU=SigmaGroup,DC=Sigma,DC=Local";                                   "Domain" = "sigma.se";              "Database" = "SQC"};
     "Sigma Quality & Compliance ApS"    = @{"OU" = "OU=Users,OU=Quality & Compliance ApS,OU=Sigma Quality & Compliance,OU=SigmaGroup,DC=sigma,DC=local";       "Domain" = "sigma.se";              "Database" = ""}
