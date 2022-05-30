@@ -133,25 +133,31 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 
     function create-px
     {
-        if($database -eq "" -or $database -eq $null)
+        if(!([string]::IsNullOrWhiteSpace($database)))
         {
-            return
-        }
-        if($database -ne "")
-        {
-            $varArray = "v18 = $alias";
-            $existingpx = Invoke-Sqlcmd -ServerInstance "SS0305.sigma.local" -Query "SELECT name FROM master.sys.sql_logins WHERE name LIKE '`$(v18)'" -Variable $varArray
-            if($existingpx)
-            {
-                "$date - PX account already exists. Alias:$alias" | Out-File $loginfo -Append
-                return $existingpx
+            $varArray = "v18 = $alias", "v19 = $alias"
+            $result = @()
+            $SQLServers =   @(
+                                (New-Object pscustomobject -Property ([Ordered]@{"Name"="SS0305";"Version"="10"})),
+                                (New-Object pscustomobject -Property ([Ordered]@{"Name"="SGM-PXSQL01";"Version"="14"}))
+                            )
+
+            foreach($srv in $SQLServers){
+                $existingpx = Invoke-Sqlcmd -ServerInstance "$($srv.Name).sigma.local" -Query "SELECT name FROM master.sys.sql_logins WHERE name LIKE '`$(v18)'" -Variable $varArray
+
+                if($existingpx)
+                {
+                    "$date - PX$($srv.Version) account already exists. Alias:$alias" | Out-File $loginfo -Append
+                    return $existingpx
+                }
+                else
+                {
+                    $existingpx =Invoke-Sqlcmd -ServerInstance "$($srv.Name).sigma.local" -Query "CREATE LOGIN [`$(v18)] WITH PASSWORD = '`$(v19)', CHECK_POLICY = OFF" -Variable $varArray
+                    return $existingpx
+                }
+                $result += New-Object PSCustomObject -Property ([Ordered]@{"Version"=$srv.Version;"Result"=$existingpx})
             }
-            else
-            {
-                $varArray = "v18 = $alias", "v19 = $alias";
-                $existingpx =Invoke-Sqlcmd -ServerInstance "SS0305.sigma.local" -Query "CREATE LOGIN [`$(v18)] WITH PASSWORD = '`$(v19)', CHECK_POLICY = OFF" -Variable $varArray
-                return $existingpx
-            }
+            return $result
         }
     }
 
@@ -286,12 +292,14 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
         Account expire date: $expire
         Manager: $usermanager
         $(
-            if ($px -notlike "System.Data.DataRow") {
-                "`n   " # New line and indentation
-                "PX: $alias"
-                "`n   " # New line and indentation
-                "PX-password: $alias"
-                "`n   " # New line and indentation
+            $px | foreach{
+                if ($_.Result -notlike "System.Data.DataRow") {
+                    "`n   " # New line and indentation
+                    "PX$($_.Version): $alias"
+                    "`n   " # New line and indentation
+                    "PX$($_.Version)-password: $alias"
+                    "`n   " # New line and indentation
+                }
             }
         )
         Best Regards

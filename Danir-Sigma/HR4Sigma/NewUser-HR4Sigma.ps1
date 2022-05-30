@@ -179,12 +179,17 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 
     function create-px
     {
-        if($database -eq "" -or $database -eq $null)
-        {}
-        else
+        if(!([string]::IsNullOrWhiteSpace($database)))
         {
-            $varArray = "v18 = $alias", "v19 = $alias";
-            Invoke-Sqlcmd -ServerInstance "SS0305.sigma.local" -Query "CREATE LOGIN [`$(v18)] WITH PASSWORD = '`$(v19)', CHECK_POLICY = OFF" -Variable $varArray
+            $varArray = "v18 = $alias", "v19 = $alias"
+            $SQLServers =   @(
+                                (New-Object pscustomobject -Property ([Ordered]@{"Name"="SS0305";"Version"="10"})),
+                                (New-Object pscustomobject -Property ([Ordered]@{"Name"="SGM-PXSQL01";"Version"="14"}))
+                            )
+
+            foreach($srv in $SQLServers){
+                Invoke-Sqlcmd -ServerInstance "$($srv.Name).sigma.local" -Query "CREATE LOGIN [`$(v18)] WITH PASSWORD = '`$(v19)', CHECK_POLICY = OFF" -Variable $varArray
+            }
         }
     }
 
