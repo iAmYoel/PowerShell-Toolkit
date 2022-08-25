@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FrxProfileFolderRedirection ExcludeCommonFolders="0">
+  <Excludes>
+<!--Teams-->
+    <Exclude Copy="0">AppData\Roaming\Microsoft\Teams\Cache</Exclude>
+    <Exclude Copy="0">AppData\Roaming\Microsoft\Teams\Application Cache</Exclude>
+    <Exclude Copy="0">AppData\Roaming\Microsoft\Teams\Service Worker\CacheStorage</Exclude>
+  </Excludes>
+
+</FrxProfileFolderRedirection>

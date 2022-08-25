@@ -91,9 +91,9 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
         $EAGroupMembersCount = (Get-ADGroupMember -Identity $EAGroupName -Recursive).Count
 
         if ($EAGroupMembersCount -lt $MaxUsers) {
-            $ReturnGroup = $EAGroupName
+            $ReturnGroup = ($EAGroupName -replace "SG_","SG_Temp_")
         }else {
-            $ReturnGroup = $CSPGroupName
+            $ReturnGroup = ($CSPGroupName -replace "SG_","SG_Temp_")
         }
 
         Return $ReturnGroup
@@ -541,22 +541,25 @@ DATABASE: $database
            #"Nexer Asset Management AS"             {}
             "Nexer Asset Management Oy"             { "Asset Management FIN Office $city" }
             "Nexer Cybersecurity AB"                { "Cybersecurity SWE Office $city" }
+            "Nexer Data Management AB"              { "Data Management SWE Office $city" }
             "Nexer Digital Ltd"                     { "Digital GBR Office $city" }
             "Nexer Enterprise Applications AB"      { "Enterprise Applications SWE Office $city" }
-            "Nexer Enterprise Applications Inc"     { "Enterprise Applications Inc Office $city" }      # No existing active user found with this company name, is this an old company that can be deleted?
+            "Nexer Enterprise Applications Inc"     { "Enterprise Applications Inc Office $city" }
             "Nexer Enterprise Applications Ltd"     { "Enterprise Applications GBR Office $city" }
             "Nexer Enterprise Applications Prv Ltd" { "Enterprise Applications IND Office $city" }
+            "Nexer Group S.A.S"                     { "Nexer COL Office $city" }
             "Nexer Infrastructure AB"               { "Infrastructure SWE Office $city" }
             "Nexer Insight AB"                      { "Insight SWE Office $city" }
-            "Nexer Insight Inc"                     { "Insight SWE Office $city" }
+            "Nexer Insight Inc"                     { "ITC Office $city" }
             "Nexer Insight Ltd"                     { "Insight GBR Office $city" }
             "Nexer Insight Sp. z o.o."              { "Insight POL Office $city" }
-           #"Nexer IT Services AB"                  { "NITS Office $city" }
+            "Nexer IT Services AB"                  { "NITS Office $city" }
             "Nexer Prv Ltd"                         { "Nexer IND Office $city" }
             "Nexer Recruit AB"                      { "Recruit SWE Office $city" }
-            "Nexer Sp. z o.o."                      { "ITC Office $city" }                              # No existing active user found with this company name, is this an old company that can be deleted?
+            "Nexer Sp. z o.o."                      { "ITC Office $city" }
             "Sigma IT Polska Sp. z o.o."            { "ITC Office $city" }
             "Nexer Tech Talent AB"                  { "Tech Talent SWE Office $city" }
+            "Nexer Unified Commerce AB"             { "Unified Commerce SWE Office" }
             Default                                 { "Office $city All" }
         }
 
@@ -582,7 +585,7 @@ DATABASE: $database
         {
             # Checks the $O365 value that has been passed from CatalystOne. Sets the correct Security group depending on the value.
             $o365group = switch ($o365) {
-                "E1"            { "SG_Office365-E1_Nexer-CSP" }
+                "E1"            { "SG_Temp_Office365-E1_Nexer-CSP" }    # Ändrat grupp till temp för nexer migrering - Yoel Abraham
                 "F1"            { Check-EALicense -License "F3" }
                 "F3"            { Check-EALicense -License "F3" }
                 "E3"            { Check-EALicense -License "E3" }

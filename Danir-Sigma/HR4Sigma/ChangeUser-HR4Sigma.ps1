@@ -395,6 +395,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
 
         # Switch to match which company the user belongs to and adds the correct group to $AddGroups
         $AddGroups += switch ($company) {
+            "CREW by Sigma"                         { "CREW Office $city" }
             "Danir AB"                              { "Danir Office $city" }
             "Sigma Civil AB"                        {
                                                         if($city -like "Stockholm")
@@ -424,18 +425,26 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
                                                         if($city -like "Köpenhamn"){ @("og-ConnectivityAll","Connectivity DK Office Copenhagen") }
                                                         else{ @("og-ConnectivityAll","Connectivity DK Office $city") }
                                                     }
+            "Sigma Connectivity Group AB"           { "Connectivity SWE Office $city" }
             "Sigma Connectivity Inc."               { @("og-ConnectivityAll","Connectivity INC Office $city") }
             "Sigma Connectivity Sp. z o.o."         { @("og-ConnectivityAll","Connectivity PL Office $city") }
             "Sigma Connectivity Engineering AB"     { @("og-ConnectivityAll","SC Engineering Office $city") }
+            "Sigma Connectivity Medtech AB"         { "Connectivity SWE Office $city" }
             "Sigma Embedded Engineering AB"         { "Embedded Engineering Office $city" }
             "Sigma Energy & Marine AB"              { "Energy Marine Office $city" }
             "Sigma Energy & Marine AS"              { "Energy Marine AS Office $city" }
+            "Sigma Industry Development AB"         { "Industry Development Office $city"}
+            "Sigma Industry East AB"                { "Industry East Office $city" }
             "Sigma Industry East North AB"          { "Industry East North Office $city" }
             "Sigma Industry Evolution AB"           { "Industry Evolution Office $city" }
-            "Sigma Industry Solutions AB"            { "Industry Solutions Office $city" }
-            "Sigma Industry South AB"                { "Industry South Office $city" }
-            "Sigma Industry West AB"                 { "Industry West Office $city" }
-            "Sigma Quality & Compliance AB"          {
+            "Sigma Industry Evolve AB"              { "Industry Evolve Office $city"}
+            "Sigma Industry Innovation AB"          { "Industry Innovation Office $city" }
+            "Sigma Industry North AB"               { "Industry North Office $city"}
+            "Sigma Industry Smart AB"               { "Industry Smart Office $city"}
+            "Sigma Industry Solutions AB"           { "Industry Solutions Office $city" }
+            "Sigma Industry South AB"               { "Industry South Office $city" }
+            "Sigma Industry West AB"                { "Industry West Office $city" }
+            "Sigma Quality & Compliance AB"         {
                                                         if($city -like "Göteborg"){ "QC Office Gothenburg" }
                                                         else{ "QC Office $city" }
                                                     }
