@@ -71,7 +71,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
     }
 
 # Load functions
-
+    # Not longer used when the customer stopped using licenses via EA and only uses licenses via CSP.
     function Check-EALicense {
         param (
             [Parameter(Mandatory)]
@@ -562,9 +562,9 @@ DATABASE: $database
             # Checks the $O365 value that has been passed from CatalystOne. Sets the correct Security group depending on the value.
             $o365group = switch ($o365) {
                 "E1"            { "SG_Office365-E1_CSP" }
-                "F1"            { Check-EALicense -License "F3" }
-                "F3"            { Check-EALicense -License "F3" }
-                "E3"            { Check-EALicense -License "E3" }
+                "F1"            { "SG_Microsoft365-F3_CSP" }
+                "F3"            { "SG_Microsoft365-F3_CSP" }
+                "E3"            { "SG_Microsoft365-E3_CSP" }
                 "Ingen licens"  {}
                 "Underkonsult"  {}
                 "UK"            {}
