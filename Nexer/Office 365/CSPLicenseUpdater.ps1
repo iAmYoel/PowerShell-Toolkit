@@ -19,11 +19,13 @@
     Contributors:       Magnus Schöllin (API)
     Contact:            Yoel.Abraham@rts.se
     Created:            2021-12-20
-    Modified:           2022-06-01
+    Modified:           2022-06-03
 
     Version history:
     1.0.0 - (2021-12-20) Script created
-    2.0.0 - (2022-06-01) Modified to use Microsoft Graph with service principal instead of MsolService
+    2.0.0 - (2022-06-03) Modified to use Microsoft Graph with service principal instead of MsolService
+    2.1.0 - (2022-08-30) Added error license assignment check and alerts for big license changes and overallocation.
+    2.2.0 - (2022-10-13) Refined the alerts and built a more granular license error reporting.
 
 #>
 
@@ -32,6 +34,87 @@ Param(
     [Parameter(HelpMessage = "Only exports a report and does not change any seats.")]
     [Switch]$ReportOnly
 )
+
+
+
+#region Set variables
+
+$Date = Get-Date -Format "yyyy-MM-dd"
+
+# Set variable for script path
+if($PSScriptRoot){
+    $scriptPath = $PSScriptRoot
+}else{
+    $scriptPath = "C:\RTSCloud\Script\CustomerSpecific\Nexer\CSPLicenseUpdater" # Used for testing when running script manually
+}
+
+# Set variable for log folder
+$LogFolderPath  = Join-Path -Path $scriptPath -ChildPath "Logs"
+$LogFilePath    = Join-Path -Path $LogFolderPath -ChildPath "CSPLicenseUpdater_$date.Log"
+
+# Set variables for report paths
+$ReportsFolderPath = Join-Path -Path $scriptPath -ChildPath "Reports"
+$CSPReportFolderPath = Join-Path -Path $ReportsFolderPath -ChildPath "CSPUpdateReports"
+$ReportOnlyFolderPath = Join-Path -Path $ReportsFolderPath -ChildPath "ReportOnly"
+$CSPReportFileName = "CSPUpdateReport_$($Date).csv"
+$ReportOnlyFileName = "ReportOnly_$date.csv"
+$CSPReportFilePath = Join-Path -Path $CSPReportFolderPath -ChildPath $CSPReportFileName
+$ReportOnlyFilePath = Join-Path -Path $ReportOnlyFolderPath -ChildPath $ReportOnlyFileName
+
+# Alert variables
+$CustomerFriendlyName   = "Nexer"
+[int32]$AlertThreshold  = 20                            # Alert threshold for license purchase
+$MailFrom               = "$CustomerFriendlyName-CSPLicenseUpdater@rts.se"
+$MailTo                 = "support@rts.se"
+$MailServer             = "smtprelay.rts.se"
+
+# Set variables for Azure Service Principal
+$CSPSecretName = "CSP"
+$MgSecretName = "Nexer-CSPLicenseUpdater"
+
+$CSPApiKey          = Get-Secret -Name $CSPSecretName -AsPlainText
+$MgSecret           = Get-Secret -Name $MgSecretname -AsPlainText
+$MgTenantId         = $MgSecret.TenantId                    # TenantId from secure string to plain text
+$MgAppId            = $MgSecret.AppId                       # AppId from secure string to plain text
+$MgThumbprint       = $MgSecret.Thumbprint                  # Certificate thumbprint from secure string to plain text
+
+# Set variables for Azure license Name
+$E3Name  = "Microsoft 365 E3"
+$F3Name  = "Microsoft 365 F3"
+$E1Name  = "Office 365 E1"
+$EMSName = "EMS E3"
+
+# Set variables for Azure license SkuIds
+$E3SkuId  = "05e9a617-0261-4cee-bb44-138d3ef5d965"
+$F3SkuId  = "66b55226-6b4f-492c-910c-a3b7a3c9d993"
+$E1SkuId  = "18181a46-0d4e-45cd-891e-60aabd171b4e"
+$EMSSkuId = "efccb6f7-5641-4e0e-bd10-b4976e1bf68e"
+
+# Set variables for CSP Subscription Reference
+$E3CSPLicenseId  = "XSP4321766"
+$F3CSPLicenseId  = "XSP4843052"
+$E1CSPLicenseId  = "XSP4453716"
+$EMSCSPLicenseId = "XSP4843060"
+
+# Set variable for CSP tenant
+$CSPAPIURL            = "https://xsp.arrow.com/index.php/api"  # API URL
+$CSPCustomerReference = "XSP811990"                            # Customer Reference
+# Get API key from secret and decrypt to plain text
+$CSPAPIKey = $CSPApiKey.ApiKey
+
+# Create an array of information for all the licenses
+$AllLicenses = @()
+$AllLicenses += [PSCustomObject]@{ "Name"=$E3Name   ; "SkuId"=$E3SkuId   ; "CSPLicenseId"=$E3CSPLicenseId  }
+$AllLicenses += [PSCustomObject]@{ "Name"=$F3Name   ; "SkuId"=$F3SkuId   ; "CSPLicenseId"=$F3CSPLicenseId  }
+$AllLicenses += [PSCustomObject]@{ "Name"=$E1Name   ; "SkuId"=$E1SkuId   ; "CSPLicenseId"=$E1CSPLicenseId  }
+$AllLicenses += [PSCustomObject]@{ "Name"=$EMSName  ; "SkuId"=$EMSSkuId  ; "CSPLicenseId"=$EMSCSPLicenseId }
+
+#endregion
+
+#endregion
+
+
+
 
 
 #region functions
@@ -48,7 +131,7 @@ function Write-LogEntry {
         [string]$Severity = "INFO",
 
         [parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
-        [string]$LogPath = (Join-Path -Path $LogFolderPath -ChildPath "CSPLicenseUpdater_$date.Log")
+        [string]$FilePath = $LogFilePath
     )
 
     # Test log file location
@@ -67,7 +150,7 @@ function Write-LogEntry {
 
         # Add value to log file
         try {
-            Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogPath -ErrorAction Stop
+            Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $FilePath -ErrorAction Stop
         }
         catch [System.Exception] {
             Write-Warning -Message "Unable to append log entry to $FileName file. Error message at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)"
@@ -77,11 +160,38 @@ function Write-LogEntry {
 
 
 
+# Function for sending alert email
+function Send-Alert {
+    param (
+        [String]$SendFrom = $MailFrom,
+        [String]$SendTo = $MailTo,
+        [String]$Subject,
+        [String]$Message
+    )
+
+    $EmailProps = @{
+        From        = $SendFrom
+        To          = $SendTo
+        Subject     = $Subject
+        Body        = $Message
+        BodyAsHTML  = $true
+        Encoding    = "UTF8"
+        SmtpServer  = $MailServer
+        Port        = 25
+    }
+
+    Send-MailMessage @EmailProps
+}
 
 # Install/Import necessary modules
 function Install-ScriptModules{
+
+    param(
+        [Parameter(Mandatory = $true, HelpMessage = "Name of the modules to be installed")]
+        [String[]]$Modules = @()
+    )
+
     Write-LogEntry -Message "Importing necessary modules..."
-    $Modules = @("Microsoft.PowerShell.SecretManagement","Microsoft.Graph.Users", "Microsoft.Graph.Groups", "Microsoft.Graph.Identity.DirectoryManagement")
     foreach ($Module in $Modules) {
         Write-LogEntry -Message "Checking $Module`t"
         Clear-Variable CurrentModule -ErrorAction SilentlyContinue
@@ -101,7 +211,13 @@ function Install-ScriptModules{
                         Install-Module -Name $Module -Force -ErrorAction Stop -Confirm:$false -Scope CurrentUser
                     }catch [System.Exception] {
                         Write-LogEntry -Severity ERROR -Message "An error occurred while attempting to install the module. Error message: $($_.Exception.Message)"
+                        $AlertType = "MgGraph Authentication"
+                        if ((Get-Content $LogFilePath) -match $AlertType) {
+                            Write-LogEntry -Severity INFO -Message "Sending $AlertType error mail alert."
+                            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
+                        }
                         Write-LogEntry -Severity WARNING -Message "Breaking script"
+                        Write-LogEntry "################ END ################"
                         Break
                     }
 
@@ -183,111 +299,10 @@ function Update-CSPLicense {
 #endregion
 
 
-# Modules
-Install-ScriptModules
-
-
-#region Authenticate to Office 365
-
-# Set variables for O365 account
-$CSPSecretName = "CSP"
-$MgSecretName = "Nexer"
-
-$CSPSecret = Get-Secret -Name CSP
-$SecureCspApiKey = Get-Secret -Name CSP
-$MgSecret = Get-Secret $MgSecretname
-$MgTenantId = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($MgSecret.TenantId))         # TenantId from secure string to plain text
-$MgAppId = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($MgSecret.AppId))               # AppId from secure string to plain text
-$MgThumbprint = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($MgSecret.Thumbprint))     # Certificate thumbprint from secure string to plain text
-
-
-# Connect to Microsoft Graph
-
-Try{
-    # The certificate needs to be installed on the server running this script.
-    $MgCert = Get-ChildItem Cert:\LocalMachine\My\$MgThumbprint -ErrorAction Stop # Get certificate object
-
-    Try{
-        # Connect to Microsoft Graph using TenantId and AppId gathered from secret vault, and also certificate from local machine
-        Connect-MgGraph -TenantId $MgTenantId -AppId $MgAppId -Certificate $MgCert -ErrorAction Stop
-    }Catch [System.Exception] {
-        Write-LogEntry -Severity ERROR -Message "An error occurred while connecting to Microsoft Graph. Error message: $($_.Exception.Message)"
-        Write-LogEntry -Severity WARNING -Message "Breaking script"
-        Break
-    }
-
-}catch [System.Exception] {
-    Write-LogEntry -Severity ERROR -Message "An error occurred while getting local certificate for Microsoft Graph. Error message: $($_.Exception.Message)"
-    Write-LogEntry -Severity WARNING -Message "Breaking script"
-    Break
-}
-
-#endregion
 
 
 
-
-#region Set variables
-
-$Date = Get-Date -Format "yyyy-MM-dd_HHmm"
-
-# Set variable for script path
-$scriptPath = Split-Path -Parent ($MyInvocation.MyCommand.Path)
-
-# Set variable for log folder
-$LogFolderPath = Join-Path -Path $scriptPath -ChildPath "Logs"
-
-# Set variables for report paths
-$ReportsFolderPath = Join-Path -Path $scriptPath -ChildPath "Reports"
-$CSPReportFolderPath = Join-Path -Path $ReportsFolderPath -ChildPath "CSPUpdateReports"
-$ReportOnlyFolderPath = Join-Path -Path $ReportsFolderPath -ChildPath "ReportOnly"
-$CSPReportFileName = "CSPUpdateReport_$($Date).csv"
-$ReportOnlyFileName = "ReportOnly_$date.csv"
-$CSPReportFilePath = Join-Path -Path $CSPReportFolderPath -ChildPath $CSPReportFileName
-$ReportOnlyFilePath = Join-Path -Path $ReportOnlyFolderPath -ChildPath $ReportOnlyFileName
-
-# Set variables for Office 365 license Name
-$E3Name = "Microsoft 365 E3"
-$F3Name = "Microsoft 365 F3"
-$E1Name = "Office 365 E1"
-$EMSName = "EMS E3"
-
-<#
-# Set variables for Office 365 license SkuPartNumbers
-$E3SkuPartNumber = "SPE_E3"
-$F3SkuPartNumber = "SPE_F1"
-$E1SkuPartNumber = "STANDARDPACK"
-$EMSSkuPartNumber = "EMS"
-#>
-
-# Set variables for Office 365 license SkuIds
-$E3SkuId = "05e9a617-0261-4cee-bb44-138d3ef5d965"
-$F3SkuId = "66b55226-6b4f-492c-910c-a3b7a3c9d993"
-$E1SkuId = "18181a46-0d4e-45cd-891e-60aabd171b4e"
-$EMSSkuId = "efccb6f7-5641-4e0e-bd10-b4976e1bf68e"
-
-# Set variables for CSP Subscription Reference
-$E3CSPLicenseId = "XSP4321766"
-$F3CSPLicenseId = "XSP4843052"
-$E1CSPLicenseId = "XSP4453716"
-$EMSCSPLicenseId = "XSP4843060"
-
-# Set variable for CSP tenant
-$CSPAPIURL = "https://xsp.arrow.com/index.php/api"  # API URL
-$CSPCustomerReference = "XSP811990"                 # Customer Reference
-# Get API key from secret and decrypt to plain text
-$CSPAPIKey = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($CSPSecret.ApiKey))
-
-# Create an array of information for all the licenses
-$AllLicenses = @()
-$AllLicenses += [PSCustomObject]@{ "Name"=$E3Name   ; "SkuId"=$E3SkuId   ; "CSPLicenseId"=$E3CSPLicenseId  }
-$AllLicenses += [PSCustomObject]@{ "Name"=$F3Name   ; "SkuId"=$F3SkuId   ; "CSPLicenseId"=$F3CSPLicenseId  }
-$AllLicenses += [PSCustomObject]@{ "Name"=$E1Name   ; "SkuId"=$E1SkuId   ; "CSPLicenseId"=$E1CSPLicenseId  }
-$AllLicenses += [PSCustomObject]@{ "Name"=$EMSName  ; "SkuId"=$EMSSkuId  ; "CSPLicenseId"=$EMSCSPLicenseId }
-
-#endregion
-
-
+Write-LogEntry "################ START ################"
 
 
 #region Create necessary folder for log and report exports and remove old logs and reports
@@ -306,6 +321,11 @@ try {
 }
 catch [System.Exception] {
     Throw "Failed to create log and report folders. Error message: $($_.Exception.Message)"
+    $AlertType = "Folder Creation"
+        if ((Get-Content $LogFilePath) -match $AlertType) {
+            Throw "Sending $AlertType error mail alert."
+            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
+        }
     Break
 }
 
@@ -321,6 +341,49 @@ Get-ChildItem –Path $CSPReportFolderPath | Where{($_.LastWriteTime -lt (Get-Da
 
 
 
+#region Authenticate to Azure
+
+
+
+
+# Connect to Microsoft Graph
+
+#Install-ScriptModules -Modules "Microsoft.PowerShell.SecretManagement","Microsoft.Graph.Users", "Microsoft.Graph.Groups", "Microsoft.Graph.Identity.DirectoryManagement"
+
+Try{
+    # The certificate needs to be installed on the server running this script.
+    $MgCert = Get-ChildItem Cert:\LocalMachine\My\$MgThumbprint -ErrorAction Stop # Get certificate object
+
+    Try{
+        # Connect to Microsoft Graph using TenantId and AppId gathered from secret vault, and also certificate from local machine
+        Connect-MgGraph -TenantId $MgTenantId -AppId $MgAppId -Certificate $MgCert -ErrorAction Stop
+    }Catch [System.Exception] {
+        Write-LogEntry -Severity ERROR -Message "An error occurred while connecting to Microsoft Graph. Error message: $($_.Exception.Message)"
+        $AlertType = "MgGraph Authentication"
+        if ((Get-Content $LogFilePath) -match $AlertType) {
+            Write-LogEntry -Severity INFO -Message "Sending $AlertType error mail alert."
+            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
+        }
+        Write-LogEntry -Severity WARNING -Message "Breaking script"
+        Write-LogEntry "################ END ################"
+        Break
+    }
+
+}catch [System.Exception] {
+    Write-LogEntry -Severity ERROR -Message "An error occurred while getting local certificate for Microsoft Graph. Error message: $($_.Exception.Message)"
+    $AlertType = "Get Certificate"
+        if ((Get-Content $LogFilePath) -match $AlertType) {
+            Write-LogEntry -Severity INFO -Message "Sending $AlertType error mail alert."
+            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName - $AlertType" -Message $_
+        }
+    Write-LogEntry -Severity WARNING -Message "Breaking script"
+    Write-LogEntry "################ END ################"
+    Break
+}
+
+#endregion
+
+
 
 
 
@@ -333,15 +396,21 @@ if ($ReportOnly) {
 
 
 
-#region Get info from Office 365 and CSP
+#region Get info from Azure and CSP
 
 # Get all users, groups and licenses
 Write-LogEntry -Message "Fetching Azure AD Users, Groups and Licenses from Microsoft Graph"
 
 try {
     $ErrorActionPreference = "Stop"
-    $AllUsers = Get-MgUser -All -Property Id,AssignedLicenses | where{$_.AssignedLicenses} | Select Id,AssignedLicenses                         # Get only users with a license
-    $AllGroups = Get-MgGroup -All -Property Id,AssignedLicenses | where{$_.AssignedLicenses} | Select Id,AssignedLicenses           # Get only groups that assigns a license
+    $AllUsers       = Get-MgUser -All -Property Id,DisplayName,UserPrincipalName,AssignedLicenses,LicenseAssignmentStates |
+                        where{$_.AssignedLicenses} |
+                        Select Id,DisplayName,UserPrincipalName,AssignedLicenses,LicenseAssignmentStates    # Get only users with a license
+
+    $AllGroups      = Get-MgGroup -All -Property Id,DisplayName,AssignedLicenses |
+                        where{$_.AssignedLicenses} |
+                        Select Id,DisplayName,AssignedLicenses                                              # Get only groups that assigns a license
+
     $AllAccountSkus = Get-MgSubscribedSku -Property SkuId,ConsumedUnits,PrePaidUnits |
         Select SkuId,
         ConsumedUnits,
@@ -350,8 +419,14 @@ try {
     $ErrorActionPreference = "Continue"
 }
 catch [System.Exception] {
-    Write-LogEntry -Severity ERROR -Message "Failed to gather information from Microsoft Graph. Error message: $($_.Exception.Message)"
-    Write-LogEntry -Severity WARNING -Message "Breaking script."
+    Write-LogEntry -Severity ERROR -Message "Failed to gather user information from Microsoft Graph. Error message: $($_.Exception.Message)"
+    $AlertType = "Get User and License info from Microsoft Graph"
+        if ((Get-Content $LogFilePath) -match $AlertType) {
+            Write-LogEntry -Severity INFO -Message "Sending $AlertType error mail alert."
+            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
+        }
+    Write-LogEntry -Message "Breaking script."
+    Write-LogEntry "################ END ################"
     Break
 }
 
@@ -360,23 +435,91 @@ catch [System.Exception] {
 
 
 
-#region Check license assignments in Office 365
+#region Check license assignments in Azure
 
-# Verify that the manually provided SkuIds in variables above match with the SkuIds found in Office 365
+# Verify that the manually provided SkuIds in variables above match with the SkuIds found in Azure
 Write-LogEntry -Message "Verifying SkuIds"
 $AllLicenses | ForEach-Object {
     if ($AllAccountSkus.SkuId -notcontains $_.SkuId) {
-        Write-LogEntry -Severity ERROR -Message "SkuId ($($_.SkuId)) provided was not found in Office 365. Please change the value in the script."
+        Write-LogEntry -Severity ERROR -Message "SkuId ($($_.SkuId)) provided was not found in Azure. Please change the value in the script."
         $VerificationError = $true
     }
 }
 
 if ($VerificationError) {
-    Write-LogEntry -Severity WARNING -Message "Breaking script."
+    $AlertType = "SkuId Verification"
+        if ((Get-Content $LogFilePath) -match $AlertType) {
+            Write-LogEntry -Severity INFO -Message "Sending $AlertType error mail alert."
+            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
+        }
+    Write-LogEntry -Message "Breaking script."
+    Write-LogEntry "################ END ################"
     Break
 }else {
     Write-LogEntry -Message "Successfully verified SkuIds"
 }
+
+
+
+
+
+
+#region Assignment state
+
+# License error translation hash table
+$LicenseErrorHash = @{}
+$LicenseErrorHash["None"] = "None"
+$LicenseErrorHash["CountViolation"] = "Not enough licenses"
+$LicenseErrorHash["MutuallyExclusiveViolation"] = "Conflicting service plans"
+$LicenseErrorHash["DependencyViolation"] = "Other products depend on this license"
+$LicenseErrorHash["ProhibitedInUsageLocationViolation"] = "Usage location isn't allowed"
+$LicenseErrorHash["UniquenessViolation"] = "UniquenessViolation"
+$LicenseErrorHash["Other"] = "Other"
+
+
+# User list with all user license assignments and license active/error state
+$AssignmentStateList = foreach ($user in $AllUsers) {   # Loop every user
+    # Loop every license assignment state for the user
+    foreach ($assignment in $user.LicenseAssignmentStates) {
+
+        # Match license from license list
+        $assignedLicense = ($AllLicenses | ? SkuId -like $assignment.SkuId)
+
+        # Skip license assignment state if license is not found
+        if (!$assignedLicense) { continue } # This is a zombie license that is not showing in Azure AD purchased SKUs.
+
+        # Translate Error value to readable error message
+        $assignmentError = $LicenseErrorHash[$assignment.Error]
+
+        # Translate assignment group id to Display Name
+        if ($assignment.AssignedByGroup) {
+            # License is assigned through a group
+            $assignmentType = "Group"
+            $assignmentGroup = ($AllGroups | ? Id -like $assignment.AssignedByGroup).DisplayName
+        }
+        else {
+            # Direct License Assignment
+            $assignmentType = "Direct"
+            $assignmentGroup = $null
+        }
+
+        # Create Custom object with all values
+        [PSCustomObject]@{
+            UserPrincipalName       = $user.UserPrincipalName
+            Name                    = $user.DisplayName
+            LicenseSkuId            = $assignment.SkuId
+            LicenseName             = $assignedLicense.Name
+            AssignmentType          = $assignmentType
+            AssignmentGroup         = $assignmentGroup
+            AssignmentState         = $assignment.State
+            AssignmentError         = $assignmentError
+            AssignmentLastUpdated   = $assignment.LastUpdatedDateTime
+        }
+    }
+}
+
+#endregion
+
 
 
 
@@ -456,7 +599,7 @@ if ($ProcessLicenses) {
             Write-LogEntry -Message "Fetching all license information from CSP-portal through API"
             $AllPurchasedSeats = (Get-CSPLicenses -ErrorAction Stop).Data.Licenses
 
-            # Loop every license from CSP-portal matched with the gathered licenses from Office 365
+            # Loop every license from CSP-portal matched with the gathered licenses from Azure
             if ($ReportOnly) {
                 Write-LogEntry -Message "Gathering license seat changes info from CSP-portal for report"
             }else {
@@ -468,7 +611,7 @@ if ($ProcessLicenses) {
 
             # Loop every license with assignment difference count
             foreach ($License in $ProcessLicenses) {
-                # Match Office 365 license from all the gathered purchased license from CSP.
+                # Match Azure license from all the gathered purchased license from CSP.
                 $CSPLicense = $AllPurchasedSeats | where{$_.license_id -eq $License.CSPLicenseId}
 
                 # If no licenses are matched, send error and skip to next in loop
@@ -488,9 +631,9 @@ if ($ProcessLicenses) {
                         [Int32]$NewPurchasedSeats = $PurchasedSeats + $License.Difference
 
                         # If NewPurchasedSeats is zero, increase with one, number of seats can't be zero.
-                        if ($NewPurchasedSeats -eq 0) {
-                            Write-LogEntry -Message "New purchased seats number is zero. Increasing the number to one."
-                            $NewPurchasedSeats++
+                        if ($NewPurchasedSeats -le 0) {
+                            Write-LogEntry -Message "New calculated purchased seats number is zero. Setting the purchased seats number to 1."
+                            $NewPurchasedSeats = 1
                         }
 
                         if (!$ReportOnly) {
@@ -501,6 +644,13 @@ if ($ProcessLicenses) {
                                     Update-CSPLicense -LicenseId $CSPLicense.license_id -Seats $NewPurchasedSeats -ErrorAction Stop
                                     Write-LogEntry -Message "Successfully updated seat change"
                                     $UpdateStatus = "SUCCESS"
+
+                                    # Email alert for big license change
+                                    if (($License.Difference -ge 20) -OR ($License.Difference -le -20)) {
+                                        Write-LogEntry -Severity WARNING -Message "License change is above threshold, sending email alert."
+                                        $AlertType = "Big license change"
+                                        Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message "$($License.Difference) $($License.Name) seats was bought for $CustomerFriendlyName tenant."
+                                    }
                                 }
                                 catch [System.Exception] {
                                     Write-LogEntry -Severity ERROR -Message "Failed to update seat change. Error message: $($_.Exception.Message)"
@@ -509,7 +659,7 @@ if ($ProcessLicenses) {
 
                             }else {
                                 # The $NewPurchasedSeats and $PurchasedSeats variables are the same.
-                                Write-LogEntry -Severity WARNING -Message "The seat number $PurchasedSeats has not changed. Skipping seat number update."
+                                Write-LogEntry -Severity WARNING -Message "The new seat number is the same as current. Skipping seat number update."
                                 $UpdateStatus = "SKIP"
                             }
                         }
@@ -545,6 +695,95 @@ if ($ProcessLicenses) {
 
 }else {
     Write-LogEntry -Message "All license seats are a match."
+    Write-LogEntry -Message "Checking license allocation..."
+
+    #region License overallocation alert
+    # List with all license that are overallocated
+    $LicenseAllocationList = @()
+
+    # Loop every license
+    foreach ($License in $AllLicenses) {
+
+        $Alert = $true
+
+        # Matched account sku
+        $AccountSku = $AllAccountSkus | where{$_.SkuId -like $License.SkuId}
+
+        # Get total count of license seats in tenant
+        [Int32]$TotalLicenseCount = $AccountSku.PrePaidUnits.Enabled
+
+        # Get count of errors for the license
+        [Int32]$LicenseErrorCount = ($AssignmentStateList | where{ ($_.LicenseSkuId -like $AccountSku.SkuId) -AND ($_.AssignmentState -like "Error")}).Count
+
+        # Add count of active licenses with count of errors to get true count
+        [Int32]$TrueLicenseCount = [Int32]$AccountSku.ConsumedUnits + [Int32]$LicenseErrorCount
+
+        # Calculate difference between total count of license and true license count
+        $LicenseDifCount = $TotalLicenseCount - $TrueLicenseCount
+
+        if ($LicenseDifCount -gt 0) {
+            Write-LogEntry -Severity WARNING -Message "$($License.Name) is overallocated with $LicenseDifCount seats."
+            $AllocationCount = "+$LicenseDifCount"
+        }elseif ($LicenseDifCount -lt 0) {
+            Write-LogEntry -Severity WARNING -Message "$($License.Name) is underallocated with $LicenseDifCount seats."
+            $AllocationCount = "-$LicenseDifCount"
+        }else{
+            # Allocation is correct
+            $Alert = $false
+        }
+
+        if($Alert){
+            $row = [PSCustomObject]@{ "Name"=$License.Name ; "SkuId"=$License.SkuId ; "TotalLicenseCount"=$TotalLicenseCount ; "TrueAssignmentCount"=$TrueLicenseCount ; "ErrorAssignmentCount"=$LicenseErrorCount ; "Allocation"=$AllocationCount }
+            $LicenseAllocationList += $row
+        }
+    }
+
+    # If a license allocation is incorrect, alert send alert email
+    if ($LicenseAllocationList) {
+        # Create custom mail body as html
+        $MailBody = "
+<h2><strong>License allocation alert!</strong></h2>
+
+<p>
+There is a discrepency between the amount licenses purschased from ArrowSphere, and the amount of users that have the license assigned, including error assignment, which is calculated by this script.
+</p>
+
+$(foreach($item in $LicenseAllocationList){
+    "<p>"
+    "Name:                  $($item.Name)<br />"
+    "SkuId:                 $($item.SkuId)<br />"
+    "TotalLicenseCount:     $($item.TotalLicenseCount)<br />"
+    "TrueAssignmentCount:   $($item.TrueAssignmentCount)<br />"
+    "ErrorAssignmentCount:  $($item.ErrorAssignmentCount)<br />"
+    "Allocation:            $($item.Allocation)"
+    "</p>"
+})
+
+<p>
+TotalLicenseCount       - Amount of all users calculated by script who needs a license and is also the amount of licenses automatically purchased from Arrow. <br />
+TrueAssignmentCount     - Amount of users that are assigned to this license, including error assignments. <br />
+ErrorAssignmentCount    - Amount of error assignment of the license.
+Allocation              - Difference between TotalLicenseCount and TrueAssignmentCount.
+</p>
+
+<p>
+Regards,<br />
+$CustomerFriendlyName CSPLicenseUpdater script<br />
+$env:USERDOMAIN\$env:COMPUTERNAME
+</p>
+"
+
+        $AlertType = "License allocation"
+        if ((Get-Content $LogFilePath) -match $AlertType) {
+            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $MailBody
+        }else {
+        Write-LogEntry -Message "All license allocations are correct."
+        }
+    #endregion
+
+    }
 }
 
-Write-LogEntry -Message "Ending script."
+#endregion
+
+Write-LogEntry "################ END ################"

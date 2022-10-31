@@ -78,8 +78,8 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
             'F3' { [int32]$MaxUsers = 525 }
         }
 
-        $EAGroupName = "SG_Temp_Office365-${License}_Nexer-EA"
-        $CSPGroupName = "SG_Temp_Microsoft365-${License}_Nexer-CSP"
+        $EAGroupName = "SG_Office365-${License}_EA"
+        $CSPGroupName = "SG_Microsoft365-${License}_CSP"
 
         $EAGroupMembersCount = (Get-ADGroupMember -Identity $EAGroupName -Recursive).Count
 
@@ -347,7 +347,8 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
             [string]$String
         )
 
-        [Text.Encoding]::ASCII.GetString([Text.Encoding]::GetEncoding("Cyrillic").GetBytes($String)) -replace "\s"
+        $NewString = $String -replace "ð","d"
+        [Text.Encoding]::ASCII.GetString([Text.Encoding]::GetEncoding("Cyrillic").GetBytes($NewString)) -replace "\s"
 
     }
 
@@ -432,7 +433,7 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
             "Nexer Cybersecurity AB"                { "Cybersecurity SWE Office $city" }
             "Nexer Digital Ltd"                     { "Digital GBR Office $city" }
             "Nexer Enterprise Applications AB"      { "Enterprise Applications SWE Office $city" }
-            "Nexer Enterprise Applications Inc"     { "Enterprise Applications Inc Office $city" }      # No existing active user found with this company name, is this an old company that can be deleted?
+            "Nexer Enterprise Applications Inc"     { "Enterprise Applications USA Office $city" }      # New company
             "Nexer Enterprise Applications Ltd"     { "Enterprise Applications GBR Office $city" }
             "Nexer Enterprise Applications Prv Ltd" { "Enterprise Applications IND Office $city" }
             "Nexer Infrastructure AB"               { "Infrastructure SWE Office $city" }
@@ -445,6 +446,8 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
             "Nexer Sp. z o.o."                      { "ITC Office $city" }                              # No existing active user found with this company name, is this an old company that can be deleted?
             "Sigma IT Polska Sp. z o.o."            { "ITC Office $city" }
             "Nexer Tech Talent AB"                  { "Tech Talent SWE Office $city" }
+            "Nexer Data Management AB"              { "Data Management SWE Office $city" }
+            "Nexer Unified Commerce AB"             { "Unified Commerce SWE $city" }
             Default                                 { "Office $city All" }
         }
 
@@ -471,17 +474,17 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
         {
             # Checks the $O365 value that has been passed from CatalystOne. Sets the correct Security group depending on the value.
             $o365group = switch ($o365) {
-                "E1"            { "SG_Temp_Office365-E1_Nexer-CSP" }
+                "E1"            { "SG_Office365-E1_CSP" }
                 "F1"            { Check-EALicense -License "F3" }
                 "F3"            { Check-EALicense -License "F3" }
-                "E3"            { "SG_Temp_Microsoft365-E3_Nexer-CSP" } # Ändrat för migrering av Nexer. Ska egentligen vara Check-EALicense -License "E3"
+                "E3"            { Check-EALicense -License "E3" }
                 "Ingen licens"  {}
                 "Underkonsult"  {}
                 "UK"            {}
             }
 
             # Gather all current 365 group memberships to be removed
-            $OldO365Groups = Get-ADPrincipalGroupMembership $alias | Where {$_.Name -match "^SG_(Microsoft|Temp_Microsoft|Office|Temp_Office)365-(F|E)(1|3)_Nexer-(CSP|EA)$"}
+            $OldO365Groups = Get-ADPrincipalGroupMembership $alias | Where {$_.Name -match "^SG(_Temp_|_)(Microsoft|Office)365-(F|E)(1|3)(_Nexer-|_)(CSP|EA)$"}
             IF($OldO365Groups)
             {
                 # Adds the found 365 groups to $RemoveGroups to be removed from membership
