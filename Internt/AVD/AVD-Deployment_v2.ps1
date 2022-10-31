@@ -164,3 +164,45 @@ New-AzRoleAssignment -ObjectId <usergroupobjectid> -RoleDefinitionName "Desktop 
 
 # 6. Setup the Windows Virtual Desktop Workspace
 # 7.
+
+
+
+
+@description('Azure Virtual Desktop Session Host VM Config')
+param avdVmParam object = {
+  location: location
+  properties: {
+      hardwareProfile: {
+        vmSize: 'Standard_B2ms'
+      }
+      osProfile: {
+        adminUsername: 'adminUsername'
+        adminPassword: 'Hallon20!'
+      }
+      storageProfile: {
+        imageReference: {
+          publisher: 'MicrosoftWindowsDesktop'
+          offer: 'Windows-11'
+          sku: 'win11-21h2-avd'
+          version: 'latest'
+        }
+        osDisk: {
+          caching: 'ReadWrite'
+          createOption: 'FromImage'
+        }
+      }
+      networkProfile: {
+        networkInterfaces: [
+          {
+            id: 'id'
+          }
+        ]
+      }
+      diagnosticsProfile: {
+        bootDiagnostics: {
+          enabled: false
+          storageUri:  'storageUri'
+        }
+      }
+  }
+}

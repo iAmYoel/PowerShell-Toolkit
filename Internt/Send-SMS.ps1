@@ -3,7 +3,7 @@
     param(
         [parameter(Mandatory)]
         [ValidateScript({$_ -match "^+"})]
-        [String]$MobilNr = "",
+        [String]$MobilNr,
 
         [String]$Password
     )

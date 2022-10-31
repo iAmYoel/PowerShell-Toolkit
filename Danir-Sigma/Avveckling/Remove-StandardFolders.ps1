@@ -1,4 +1,4 @@
-﻿$LogPath = "C:\RTSC-Delete.log"
+﻿$LogPath = "C:\RTSC-FolderDelete.log"
 $NewDeleteFolder = "C:\RTSC-Delete"
 
 Start-Transcript -Path $LogPath -Append -Force

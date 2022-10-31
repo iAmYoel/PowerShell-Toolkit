@@ -294,7 +294,7 @@ Try{
 
 # Alert variables
 $CustomerFriendlyName   = ""
-[int32]$AlertThreshold  = 20                            # Alert threshold for license purchase
+[int32]$AlertThreshold  = 20                                                # Alert threshold for license purchase
 $MailFrom               = "$CustomerFriendlyName-CSPLicenseUpdater@rts.se"
 $MailTo                 = "Yoel.Abraham@rts.se"
 $MailServer             = "smtprelay.net.sigma.se"
