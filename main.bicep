@@ -10,22 +10,23 @@ param vmCount int = 2
 
 
 
-@description('Virtual Network Network Security Group config for Azure Virtual Desktop')
-param avdVirtualNetworkNSGParam object = {
+
+@description('Network Security Group config for Azure Virtual Desktop')
+param avdNSGParam object = {
   name: 'avd-vnet01-nsg'
   location: location
   properties: {
     securityRules: [
       {
-        name: 'default-allow-3389-tcp-in'
+        name: 'AllowRDPInBound'
         properties: {
-          priority: 1000
+          priority: 300
           access: 'Allow'
           direction: 'Inbound'
           destinationPortRange: '3389'
           protocol: 'Tcp'
           sourcePortRange: '*'
-          sourceAddressPrefix: '*'
+          sourceAddressPrefix: '81.92.73.67'
           destinationAddressPrefix: '*'
         }
       }
@@ -44,13 +45,13 @@ param avdVirtualNetworkParam object = {
   addressPrefixes: [
     {
       name: 'avd-vnet01-prefix01'
-      addressPrefix: '10.0.0.0/16'
+      addressPrefix: '172.16.0.0/24'
     }
   ]
   subnets: [
     {
       name: 'avd-vnet01-snet01'
-      addressPrefix: '10.0.0.0/24'
+      addressPrefix: '172.16.0.0/26'
     }
   ]
 }
@@ -60,11 +61,11 @@ param avdVirtualNetworkParam object = {
 
 @description('Azure Virtual Desktop Host Pool config')
 param avdHostPoolParam object = {
-  name: 'avd-hostpool'
+  name: 'avd-hp01'
   location: location
   properties: [
     {
-      friendlyName: 'AVD Host Pool'
+      friendlyName: 'AVD Hostpool'
       hostPoolType: 'Pooled'
       loadBalancerType: 'BreadthFirst'
       preferredAppGroupType: 'Desktop'
@@ -156,7 +157,7 @@ param avdVmParam object = {
 
 
 
-@description('Azure Virtual Desktop Session Host VM Domain Join Extension Config')
+/* @description('Azure Virtual Desktop Session Host VM Domain Join Extension Config')
 param avdVmDomainJoinExtParam object = {
   name: 'DomainJoinExtension'
   location: location
@@ -178,39 +179,187 @@ param avdVmDomainJoinExtParam object = {
     }
   }
 }
+ */
+
+
+
+/*
+
+param avdStorageAccParam object = {
+  name: 'avdstorageaccount${uniqueString(resourceGroup().id)}'
+  location: location
+  kind: 'StorageV2'
+  sku: {
+    name: 'Standard_RAGRS'
+  }
+  properties: {
+    accessTier: 'Hot'
+  }
+}
+
+*/
 
 
 
 
 //#######################################################################################################################################
 
-
-
-
-
-
-
-resource avdVirtualNetworkNSG 'Microsoft.Network/networkSecurityGroups@2021-02-01' = {
-  name: avdVirtualNetworkNSGParam.name
-  location: avdVirtualNetworkNSGParam.location
+// Nedan är inte färdig
+resource aaddsDomain 'Microsoft.AAD/domainServices@2021-05-01' = {
+  name: ''
+  location: ''
   properties: {
-    securityRules: [
+    domainName: ''
+    filteredSync: 'Disabled'
+    domainConfigurationType: 'FullySynced'
+    notificationSettings: {
+      notifyGlobalAdmins: 'Enabled'
+      notifyDcAdmins: 'Enabled'
+      additionalRecipients: []
+    }
+    replicaSets: [
       {
-        name: avdVirtualNetworkNSGParam.properties.securityRules[0].name
+        subnetId:
+        location:''
+      }
+    ]
+    domainSecuritySettings: {
+      tlsV1: 'Enabled'
+      ntlmV1: 'Disabled'
+      syncNtlmPasswords: 'Enabled'
+      syncOnPremPasswords: 'Enabled'
+      kerberosRc4Encryption: 'Enabled'
+      kerberosArmoring: 'Disabled'
+    }
+    sku: 'standard'
+  }
+}
+
+// Nedan är inte färdig
+resource aaddsVirtualNetwork 'Microsoft.Network/virtualNetworks@2022-05-01' = {
+  name: 'aadds-vnet'
+  location: location
+  properties: {
+    addressSpace: {
+      addressPrefixes: [
+        '10.0.0.0/16'
+      ]
+    }
+    subnets: [
+      {
+        name: 'Subnet-1'
         properties: {
-          priority: avdVirtualNetworkNSGParam.properties.securityRules[0].properties.priority
-          access: avdVirtualNetworkNSGParam.properties.securityRules[0].properties.access
-          direction: avdVirtualNetworkNSGParam.properties.securityRules[0].properties.direction
-          destinationPortRange: avdVirtualNetworkNSGParam.properties.securityRules[0].properties.destinationPortRange
-          protocol: avdVirtualNetworkNSGParam.properties.securityRules[0].properties.protocol
-          sourcePortRange: avdVirtualNetworkNSGParam.properties.securityRules[0].properties.sourcePortRange
-          sourceAddressPrefix: avdVirtualNetworkNSGParam.properties.securityRules[0].properties.sourceAddressPrefix
-          destinationAddressPrefix: avdVirtualNetworkNSGParam.properties.securityRules[0].properties.destinationaddressprefix
+          addressPrefix: '10.0.0.0/24'
+        }
+      }
+      {
+        name: 'Subnet-2'
+        properties: {
+          addressPrefix: '10.0.1.0/24'
         }
       }
     ]
   }
 }
+
+
+
+
+
+
+
+
+
+
+// Nedan är ej testad
+resource avdstorageacc 'Microsoft.Storage/storageAccounts@2021-09-01' = {
+  name: avdStorageAccParam.name
+  location: avdStorageAccParam.location
+  kind: avdStorageAccParam.kind
+  sku: {
+    name: 'Standard_LRS'
+    tier: 'Standard'
+  }
+  properties: {
+    dnsEndpointType: 'Standard'
+    defaultToOAuthAuthentication: false
+    publicNetworkAccess: 'Enabled'
+    allowCrossTenantReplication: true
+    azureFilesIdentityBasedAuthentication: {
+      directoryServiceOptions: 'AADDS'
+      activeDirectoryProperties: {
+        domainName: ''
+        domainGuid: ''
+      }
+    }
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: true
+    allowSharedKeyAccess: true
+    networkAcls: {
+      bypass: 'AzureServices'
+      virtualNetworkRules: []
+      ipRules: []
+      defaultAction: 'Allow'
+    }
+    supportsHttpsTrafficOnly: true
+    encryption: {
+      requireInfrastructureEncryption: false
+      services: {
+        file: {
+          keyType: 'Account'
+          enabled: true
+        }
+        table: {
+          keyType: 'Account'
+          enabled: true
+        }
+        queue: {
+          keyType: 'Account'
+          enabled: true
+        }
+        blob: {
+          keyType: 'Account'
+          enabled: true
+        }
+      }
+      keySource: 'Microsoft.Storage'
+    }
+    accessTier: 'Hot'
+  }
+}
+
+
+
+
+
+
+
+
+
+
+resource avdNSG 'Microsoft.Network/networkSecurityGroups@2021-02-01' = {
+  name: avdNSGParam.name
+  location: avdNSGParam.location
+  properties: {
+    securityRules: [
+      {
+        name: avdNSGParam.properties.securityRules[0].name
+        properties: {
+          priority: avdNSGParam.properties.securityRules[0].properties.priority
+          access: avdNSGParam.properties.securityRules[0].properties.access
+          direction: avdNSGParam.properties.securityRules[0].properties.direction
+          destinationPortRange: avdNSGParam.properties.securityRules[0].properties.destinationPortRange
+          protocol: avdNSGParam.properties.securityRules[0].properties.protocol
+          sourcePortRange: avdNSGParam.properties.securityRules[0].properties.sourcePortRange
+          sourceAddressPrefix: avdNSGParam.properties.securityRules[0].properties.sourceAddressPrefix
+          destinationAddressPrefix: avdNSGParam.properties.securityRules[0].properties.destinationaddressprefix
+        }
+      }
+    ]
+  }
+}
+
+
 
 
 
@@ -230,13 +379,15 @@ resource avdVirtualNetwork 'Microsoft.Network/virtualNetworks@2022-01-01' = {
         properties: {
           addressPrefix: avdVirtualNetworkParam.subnets[0].addressPrefix
           networkSecurityGroup: {
-            id: avdVirtualNetworkNSG.id
+            id: avdNSG.id
           }
         }
       }
     ]
   }
 }
+
+
 
 
 
@@ -255,7 +406,23 @@ resource avdHostPool 'Microsoft.DesktopVirtualization/hostPools@2021-07-12' = {
 
 
 
-/*
+// Nedan är ej testad
+resource avdSharedImageGallery 'Microsoft.Compute/galleries@2022-03-03' = {
+  name:
+  location:
+  properties: {
+    description:
+  }
+}
+
+
+
+
+
+
+
+
+/* Ej testad
 resource avdWorkSpace 'Microsoft.DesktopVirtualization/workspaces@2021-07-12' = {
   name: avdWorkSpacesParam.name
   location: avdWorkSpacesParam.location
@@ -270,6 +437,9 @@ resource avdWorkSpace 'Microsoft.DesktopVirtualization/workspaces@2021-07-12' = 
 
 
 
+
+
+/* Funkar, behövs vid skapand av VM i resursen nedan
 resource avdVmNic 'Microsoft.Network/networkInterfaces@2021-02-01' = [for i in range(0, vmCount): {
   name: '${vmNamePrefix}${format('{0:00}',(i + 1))}-nic1'
   location: avdVmNicParam.location
@@ -287,11 +457,14 @@ resource avdVmNic 'Microsoft.Network/networkInterfaces@2021-02-01' = [for i in r
     ]
   }
 }]
+*/
 
 
 
 
 
+
+/* Funkar
 resource avdVm 'Microsoft.Compute/virtualMachines@2022-03-01' = [for i in range(0, vmCount): {
   name: '${vmNamePrefix}${format('{0:00}',(i + 1))}'
   location: avdVmParam.location
@@ -332,10 +505,15 @@ resource avdVm 'Microsoft.Compute/virtualMachines@2022-03-01' = [for i in range(
     }
   }
 }]
+*/
 
 
 
 
+
+
+
+/* Ej testad
 resource avdVmDomainJoinExt 'Microsoft.Compute/virtualMachines/extensions@2022-03-01' = [for i in range(0, vmCount): {
   parent: avdVm[i]
   name: avdVmDomainJoinExtParam.name
@@ -358,3 +536,9 @@ resource avdVmDomainJoinExt 'Microsoft.Compute/virtualMachines/extensions@2022-0
     }
   }
 }]
+*/
+
+
+
+
+
