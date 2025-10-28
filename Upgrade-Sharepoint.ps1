@@ -9,11 +9,11 @@
 
 [CmdletBinding(DefaultParameterSetName = "Default")]
 param (
-    [Parameter(Mandatory = $true, HelpMessage = "SharePoint farm version to upgrade.", ParameterSetName = "Download")]
-    [Parameter(Mandatory = $true, HelpMessage = "SharePoint farm version to upgrade.", ParameterSetName = "UpgradeOnly")]
-    [Parameter(Mandatory = $true, HelpMessage = "SharePoint farm version to upgrade.", ParameterSetName = "Default")]
+    [Parameter(Mandatory = $false, HelpMessage = "SharePoint farm version to upgrade.", ParameterSetName = "Download")]
+    [Parameter(Mandatory = $false, HelpMessage = "SharePoint farm version to upgrade.", ParameterSetName = "UpgradeOnly")]
+    [Parameter(Mandatory = $false, HelpMessage = "SharePoint farm version to upgrade.", ParameterSetName = "Default")]
     [ValidateSet('SE', '2019', '2016', '2013')]
-    [String]$SharePointVersion,
+    [String]$SharePointEdition,
 
     [Parameter(Mandatory = $false, HelpMessage = "Automatically download patch file and install them.", ParameterSetName = "Download")]
     [Switch]$DownloadPatch,
@@ -23,6 +23,34 @@ param (
 )
 
 # === FUNCTIONS ===
+function Set-InternetExplorerESC {
+    [CmdletBinding()]
+    param (
+        [Parameter()]
+        [ValidateSet("Admins", "Users", "Both")]
+        [String]$Scope = "Both",
+
+        [Parameter(Mandatory=$true)]
+        [ValidateSet("Enable", "Disable")]
+        [String]$Action
+    )
+
+    if($Action -eq "Enable") {
+        $IEESValue = 1
+    } elseif ($Action -eq "Disable") {
+        $IEESValue = 0
+    }
+
+    if ($Scope -eq "Both" -or $Scope -eq "Admins") {
+        Set-ItemProperty -Path $IEESAdminKey -Name $IEESProperty -Value $IEESValue
+    } elseif ($Scope -eq "Both" -or $Scope -eq "Users") {
+        Set-ItemProperty -Path $IEESUserKey -Name $IEESProperty -Value $IEESValue
+    }
+
+    Stop-Process -Name Explorer
+    Write-Host "IE Enhanced Security Configuration (ESC) has been ${Action}d." -ForegroundColor Green
+}
+
 function Browse-File {
     [CmdletBinding()]
     param (
@@ -47,11 +75,32 @@ function Browse-File {
     }
 }
 
+function Browse-Folder {
+    [CmdletBinding()]
+    param (
+        [string]$Description = "Select a folder where sharepoint patch files are located",
+        [string]$InitialDirectory = [Environment]::GetFolderPath("Desktop")
+    )
+
+    Add-Type -AssemblyName System.Windows.Forms
+
+    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dialog.Description = $Description
+    $dialog.SelectedPath = $InitialDirectory
+    $dialog.ShowNewFolderButton = $true
+
+    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        return $dialog.SelectedPath
+    }
+    else {
+        return $null
+    }
+}
+
 function Invoke-SPPsConfigUpgrade {
 
     $errorString = "Exception: The upgraded database schema doesn't match the TargetSchema"
     $psconfigArgs = "-cmd helpcollections -installall -cmd secureresources -cmd services -install -cmd installfeatures -cmd applicationcontent -install -cmd upgrade -inplace b2b -force -wait"
-
 
     $procInfo = New-Object System.Diagnostics.ProcessStartInfo
     $procInfo.FileName = "psconfig.exe"
@@ -459,6 +508,13 @@ function Get-SPVersion {
     $farmVersion = $farmBuild.ToString()
     $farmMajorVersion = $farmBuild.Major
 
+    switch -Regex ($farmVersion) {
+        "^15\."                 { $edition = "2013"}
+        "^16\.0\.\d{5}"         { $edition = "SE" }
+        "^16\.0\.(4|5|6)\d{3}"  { $edition = "2016" }
+        "^16\.0\.(10|11)\d{3}"  { $edition = "2019" }
+    }
+
     # Determine correct ISAPI path based on version
     switch ($farmMajorVersion) {
         15 { $dllPath = "C:\Program Files\Common Files\Microsoft Shared\Web Server Extensions\15\ISAPI\Microsoft.SharePoint.dll" }
@@ -475,6 +531,7 @@ function Get-SPVersion {
         InstalledVersion = $dllVersion
         FarmVersion = $farmVersion
         DatabaseVersion = $dbVersion
+        Edition = $edition
     }
 }
 
@@ -489,65 +546,68 @@ function Run-SPUpgrade {
             $dbsToUpgrade = Get-SPContentDatabase | Where-Object { $_.NeedsUpgrade -eq $true }
             foreach ($db in $dbsToUpgrade) {
                 try {
-                    Write-Host "Upgrading content database: $($db.Name)..."
+                    Write-Host "Upgrading content database: $($db.Name)..." -ForegroundColor Cyan
                     Upgrade-SPContentDatabase -Identity $db -Confirm:$false
                 } catch {
-                    Write-Error "Failed while upgrading content database '$($db.Name)': $_"
+                    Write-Host "Failed while upgrading content database '$($db.Name)': $_" -ForegroundColor Red
                     End-Script -exitCode 1
                 }
             }
 
-            Write-Host "Retrying psconfig.exe after upgrading databases..."
+            Write-Host "Retrying psconfig.exe after upgrading databases..." -ForegroundColor Cyan
             $retryResult = Invoke-SPPsConfigUpgrade
 
             if ($retryResult.ExitCode -ne 0) {
-                Write-Error "psconfig.exe failed again with exit code $($retryResult.ExitCode)"
+                Write-Host "psconfig.exe failed again with exit code $($retryResult.ExitCode)" -ForegroundColor Red
                 End-Script -exitCode 1
             }
             else {
-                Write-Host "psconfig.exe completed successfully after retry."
+                Write-Host "psconfig.exe completed successfully after retry." -ForegroundColor Green
             }
         }
 
         else {
-            Write-Error "psconfig.exe failed with unexpected error. Exit code: $($result.ExitCode)"
+            Write-Host "psconfig.exe failed with unexpected error. Exit code: $($result.ExitCode)" -ForegroundColor Red
             End-Script -exitCode 1
         }
     }
     else {
-        Write-Host "psconfig.exe completed successfully."
+        Write-Host "psconfig.exe completed successfully." -ForegroundColor Green
     }
 
     try {
-            Write-Host "Step 4: Logging post-upgrade content database versions..."
-            Get-SPContentDatabase -ErrorAction Stop | Select Name, Id, Server, NeedsUpgrade, Version | Format-List
-        }
-        catch {
-            Write-Warning "Failed to log post-upgrade content DB info: $_"
-        }
+            $currentDatabaseInfo = Get-SPContentDatabase -ErrorAction Stop
+            if ($currentDatabaseInfo) {
+                Write-Host "Logging post-upgrade content database versions..." -ForegroundColor cyan
+                $currentDatabaseInfo = Get-SPContentDatabase -ErrorAction Stop
+                $currentDatabaseInfo | Select Name, Id, Server, NeedsUpgrade, Version | Format-List
 
-        try {
-            $currentVersion = Get-SPVersion
+                try {
+                    $currentVersion = Get-SPVersion
 
-            Write-Host ""
-            Write-Host "Final version validation:"
-            Write-Host "---------------------------------------------"
-            Write-Host "DLL Version (Microsoft.SharePoint.dll): $($currentVersion.InstalledVersion)"
-            Write-Host "Farm Build Version (Get-SPFarm):        $($currentVersion.FarmVersion)"
-            Write-Host "Content DB Build Version:               $(($currentVersion.DatabaseVersion -join ', ').ToString())"
-            Write-Host "---------------------------------------------"
+                    Write-Host ""
+                    Write-Host "Final version validation:"
+                    Write-Host "---------------------------------------------"
+                    Write-Host "DLL Version (Microsoft.SharePoint.dll): $($currentVersion.InstalledVersion)"
+                    Write-Host "Farm Build Version (Get-SPFarm):        $($currentVersion.FarmVersion)"
+                    Write-Host "Content DB Build Version:               $(($currentVersion.DatabaseVersion -join ', ').ToString())"
+                    Write-Host "---------------------------------------------"
 
-            if ($currentVersion.InstalledVersion -eq $currentVersion.FarmVersion -and $currentVersion.FarmVersion -eq ($currentVersion.DatabaseVersion)[0].ToString() -and $currentDatabaseInfo.NeedsUpgrade -notcontains $true) {
-                Write-Host "SharePoint farm successfully upgraded to version '$($currentVersion.InstalledVersion)'." -ForegroundColor Green
-            } else {
-                Write-Warning "Version mismatch detected. "
-                if ($currentDatabaseInfo.NeedsUpgrade -contains $true) {
-                    Write-Warning "Follwing content databases still need upgrade: $($currentDatabaseInfo | Where-Object { $_.NeedsUpgrade -eq $true } | Select-Object -ExpandProperty Name)"
+                    if ($currentVersion.InstalledVersion -eq $currentVersion.FarmVersion -and $currentVersion.FarmVersion -eq ($currentVersion.DatabaseVersion)[0].ToString() -and $currentDatabaseInfo.NeedsUpgrade -notcontains $true) {
+                        Write-Host "SharePoint farm successfully upgraded to version '$($currentVersion.InstalledVersion)'." -ForegroundColor Green
+                    } else {
+                        Write-Warning "Version mismatch detected. "
+                        if ($currentDatabaseInfo.NeedsUpgrade -contains $true) {
+                            Write-Warning "Follwing content databases still need upgrade: $($currentDatabaseInfo | Where-Object { $_.NeedsUpgrade -eq $true } | Select-Object -ExpandProperty Name)"
+                        }
+                    }
+                } catch {
+                    Write-Warning "Failed to retrieve version information: $_"
                 }
             }
         }
         catch {
-            Write-Warning "Failed to retrieve version information: $_"
+            Write-Warning "Failed to log post-upgrade content DB info: $_"
         }
 }
 
@@ -631,19 +691,34 @@ Function Install-SPPatch {
 
         if ($OnlySTS) {
             if ($sts -eq $null) {
-                Write-Host 'Missing the sts patch. Please make sure the sts patch present in the specified directory.' -ForegroundColor Red
-                return
+                $errorMessage = 'Missing the sts patch. Please make sure the sts patch present in the specified directory.'
+                Write-Host $errorMessage -ForegroundColor Red
+                return @{
+                    ExitCode = 1
+                    RebootRequired = $false
+                    ErrorMessage = $errorMessage
+                }
             }
         }
         else {
             if ($sts -eq $null -and $wssloc -eq $null) {
-                Write-Host 'Missing the sts and wssloc patch. Please make sure both patches are present in the specified directory.' -ForegroundColor Red
-                return
+                $errorMessage = 'Missing the sts and wssloc patch. Please make sure both patches are present in the specified directory.'
+                Write-Host $errorMessage -ForegroundColor Red
+                return @{
+                    ExitCode = 1
+                    RebootRequired = $false
+                    ErrorMessage = $errorMessage
+                }
             }
 
             if ($sts -eq $null -or $wssloc -eq $null) {
-                Write-Host '[Warning] Either the sts and wssloc patch is not available. Please make sure both patches are present in the same directory or safely ignore if only single patch is available.' -ForegroundColor Yellow
-                return
+                $errorMessage = '[Warning] Either the sts and wssloc patch is not available. Please make sure both patches are present in the same directory or safely ignore if only single patch is available.'
+                Write-Host $errorMessage -ForegroundColor Yellow
+                return @{
+                    ExitCode = 1
+                    RebootRequired = $false
+                    ErrorMessage = $errorMessage
+                }
             }
         }
 
@@ -660,14 +735,19 @@ Function Install-SPPatch {
         $patchfiles = Get-ChildItem -LiteralPath $Path  -Filter *.exe | ? { $_.Name -match '([A-Za-z0-9\-]+)2013-kb([A-Za-z0-9\-]+)glb.exe' }
 
         if ($patchfiles -eq $null) {
-            Write-Host 'Unable to retrieve the file(s). Exiting Script' -ForegroundColor Red
-            return
+            $errorMessage = 'Unable to retrieve the file(s).'
+            Write-Host $errorMessage -ForegroundColor Red
+            return @{
+                ExitCode = 1
+                RebootRequired = $false
+                ErrorMessage = $errorMessage
+            }
         }
 
         Write-Host -ForegroundColor Yellow "Installing $patchfiles"
     }
     elseif ($majorVersion -lt '15') {
-        throw 'This cmdlet supports SharePoint 2013 and above.'
+        throw 'This script only supports SharePoint 2013 and above.'
     }
 
     ########################
@@ -675,68 +755,79 @@ Function Install-SPPatch {
     ########################
     ##Checking Search services##
 
-    $oSearchSvc = Get-Service "OSearch$majorVersion"
-    $sPSearchHCSvc = Get-Service "SPSearchHostController"
+    try {
 
-    if (($oSearchSvc.status -eq 'Running') -or ($sPSearchHCSvc.status -eq 'Running')) {
-        $searchSvcRunning = $true
-        if ($Pause) {
-            $ssas = Get-SPEnterpriseSearchServiceApplication
+        $oSearchSvc = Get-Service "OSearch$majorVersion"
+        $sPSearchHCSvc = Get-Service "SPSearchHostController"
 
-            foreach ($ssa in $ssas) {
-                Write-Host -ForegroundColor Yellow "Pausing the Search Service Application: $($ssa.DisplayName)"
-                Write-Host  -ForegroundColor Yellow  ' This could take a few minutes...'
-                Suspend-SPEnterpriseSearchServiceApplication -Identity $ssa | Out-Null
+        if (($oSearchSvc.status -eq 'Running') -or ($sPSearchHCSvc.status -eq 'Running')) {
+            $searchSvcRunning = $true
+            if ($Pause) {
+                $ssas = Get-SPEnterpriseSearchServiceApplication
+
+                foreach ($ssa in $ssas) {
+                    Write-Host -ForegroundColor Yellow "Pausing the Search Service Application: $($ssa.DisplayName)"
+                    Write-Host  -ForegroundColor Yellow  ' This could take a few minutes...'
+                    Suspend-SPEnterpriseSearchServiceApplication -Identity $ssa | Out-Null
+                }
+            }
+            elseif ($Stop) {
+                Write-Host -ForegroundColor Cyan ' Continuing without pausing the Search Service Application'
             }
         }
-        elseif ($Stop) {
-            Write-Host -ForegroundColor Cyan ' Continuing without pausing the Search Service Application'
+
+        #We don't need to stop SharePoint Services for 2016 and above
+        if ($majorVersion -lt '16') {
+            Write-Host -ForegroundColor Yellow 'Stopping Search Services if they are running'
+
+            if ($oSearchSvc.status -eq 'Running') {
+                Set-Service -Name "OSearch$majorVersion" -StartupType Disabled
+                Stop-Service "OSearch$majorVersion" -WA 0
+            }
+
+            if ($sPSearchHCSvc.status -eq 'Running') {
+                Set-Service 'SPSearchHostController' -StartupType Disabled
+                Stop-Service 'SPSearchHostController' -WA 0
+            }
+
+            Write-Host -ForegroundColor Green 'Search Services are Stopped'
+            Write-Host
+
+            #######################
+            ##Stop Other Services##
+            #######################
+            Set-Service -Name 'IISADMIN' -StartupType Disabled
+            Set-Service -Name 'SPTimerV4' -StartupType Disabled
+
+            Write-Host -ForegroundColor Green 'Gracefully stopping IIS...'
+            Write-Host
+            iisreset -stop -noforce
+            Write-Host -ForegroundColor Yellow 'Stopping SPTimerV4'
+            Write-Host
+
+            $sPTimer = Get-Service 'SPTimerV4'
+            if ($sPTimer.Status -eq 'Running') {
+                Stop-Service 'SPTimerV4'
+            }
+
+            Write-Host -ForegroundColor Green 'Services are Stopped'
+            Write-Host
+            Write-Host
         }
-    }
-
-    #We don't need to stop SharePoint Services for 2016 and above
-    if ($majorVersion -lt '16') {
-        Write-Host -ForegroundColor Yellow 'Stopping Search Services if they are running'
-
-        if ($oSearchSvc.status -eq 'Running') {
-            Set-Service -Name "OSearch$majorVersion" -StartupType Disabled
-            Stop-Service "OSearch$majorVersion" -WA 0
+    } catch {
+        $errorMessage = "Failed to stop relevant services before patch. Error message: $($_.Exception)"
+        Write-Host $errorMessage -ForegroundColor Red
+        return @{
+            ExitCode = 1
+            RebootRequired = $false
+            ErrorMessage = $errorMessage
         }
-
-        if ($sPSearchHCSvc.status -eq 'Running') {
-            Set-Service 'SPSearchHostController' -StartupType Disabled
-            Stop-Service 'SPSearchHostController' -WA 0
-        }
-
-        Write-Host -ForegroundColor Green 'Search Services are Stopped'
-        Write-Host
-
-        #######################
-        ##Stop Other Services##
-        #######################
-        Set-Service -Name 'IISADMIN' -StartupType Disabled
-        Set-Service -Name 'SPTimerV4' -StartupType Disabled
-
-        Write-Host -ForegroundColor Green 'Gracefully stopping IIS...'
-        Write-Host
-        iisreset -stop -noforce
-        Write-Host -ForegroundColor Yellow 'Stopping SPTimerV4'
-        Write-Host
-
-        $sPTimer = Get-Service 'SPTimerV4'
-        if ($sPTimer.Status -eq 'Running') {
-            Stop-Service 'SPTimerV4'
-        }
-
-        Write-Host -ForegroundColor Green 'Services are Stopped'
-        Write-Host
-        Write-Host
     }
 
     ##################
     ##Start patching##
     ##################
-    Write-Host -ForegroundColor Yellow 'Working on it... Please keep this PowerShell window open...'
+    Write-Host -ForegroundColor Yellow 'Patch install started... Please keep this PowerShell window open...'
     Write-Host
 
     $patchStartTime = Get-Date
@@ -745,6 +836,8 @@ Function Install-SPPatch {
         $filename = $patchfile.Fullname
         #unblock the file, to get rid of the prompts
         Unblock-File -Path $filename -Confirm:$false
+
+        Write-Host "Installing $($patchfile.Name)..." -ForegroundColor Cyan
 
         if ($SilentInstall) {
             $process = Start-Process $filename -ArgumentList '/passive /quiet' -PassThru -Wait
@@ -757,7 +850,7 @@ Function Install-SPPatch {
             $reboot = $true
         }
 
-        Write-Host -ForegroundColor Yellow "Patch $patchfile installed with Exit Code $($process.ExitCode)"
+        Write-Host -ForegroundColor Yellow "Patch $($patchfile.Name) installed with Exit Code $($process.ExitCode)"
     }
 
     $patchEndTime = Get-Date
@@ -806,10 +899,6 @@ Function Install-SPPatch {
     $endTime = Get-Date
     Write-Host -ForegroundColor Green 'Services are Started'
 
-    if ($reboot) {
-        Write-Host -ForegroundColor Yellow 'A reboot is required'
-    }
-
     return @(
         @{
             ExitCode = $process.ExitCode
@@ -823,6 +912,12 @@ function End-Script {
     param(
         [int]$exitCode = 0
     )
+
+    if ($IEESScope) {
+        Write-Host "Restoring Internet Explorer Enhanced Security settings..." -ForegroundColor Cyan
+        Set-InternetExplorerESC -Scope $IEESScope -Action Enable
+    }
+
     $endTime = Get-Date
     Write-Host -ForegroundColor Yellow ('Script completed in {0:g}' -f ($endTime - $startTime))
     Write-Host -ForegroundColor Yellow 'Started:'  $startTime
@@ -833,39 +928,40 @@ function End-Script {
     Exit $exitCode
 }
 
-# === CONFIGURATION ===
+#region === CONFIGURATION ===
 $startTime = Get-Date
 $scriptPath = $MyInvocation.MyCommand.Definition
-$scriptFolder = Split-Path -Parent $scriptPath
+if (Test-Path $scriptPath -Include "*.ps1" -ErrorAction SilentlyContinue) {
+    $scriptFolder = Split-Path -Parent $scriptPath
+} else {
+    $scriptFolder = "C:\temp\Sharepoint patch"
+}
 $logPath = Join-Path -Path $scriptFolder -ChildPath "SPLogs"
-$patchPath = $logPath = Join-Path -Path $scriptFolder -ChildPath "SPUpdateFiles"
+$patchPath = Join-Path -Path $scriptFolder -ChildPath "SPUpdateFiles"
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $logFile = Join-Path $logPath "SharePointUpgrade_$timestamp.log"
 
 $taskName = "SharePointUpgrade-AfterRebootTask"
 $taskDescription = "Automatically created by Upgrade-Sharepoint script to continue upgrade after install and reboot of patch."
 $taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
-$taskAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -DownloadPatch -UpgradeOnly"
+$taskAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -UpgradeOnly"
 $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -DisallowDemandStart
+#endregion
 
-<#
-# Email settings (configure these)
-$emailFrom = "sharepoint-upgrade@yourdomain.com"
-$emailTo = "sp-admins@yourdomain.com"
-$smtpServer = "smtp.yourdomain.com"
-$emailSubject = "SharePoint Farm Upgrade Log - $timestamp"
- #>
-
-# === SETUP ===
+#region === Pre-step: SETUP ===
 if (!(Test-Path $logPath)) {
     New-Item -Path $logPath -ItemType Directory | Out-Null
 }
 
 if (!(Test-Path $patchPath)) {
     New-Item -Path $patchPath -ItemType Directory | Out-Null
+} else {
+    Get-ChildItem -Path $patchPath | Remove-Item -Force -Confirm:$false
 }
 
 Start-Transcript -Path $logFile -Append
+
+# Output running context
 if ($UpgradeOnly.IsPresent) {
     Write-Host "Running SharePoint upgrade only..." -ForegroundColor Yellow
 } elseif ($DownloadPatch.IsPresent) {
@@ -886,6 +982,30 @@ try {
     End-Script -exitCode 1
 }
 
+# Handle Internet Explorer Enhanced Security
+$IEESAdminKey = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"
+$IEESUserKey = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}"
+$IEESProperty = "IsInstalled"
+
+$IEESAdminValue = (Get-ItemProperty -Path $IEESAdminKey -Name $IEESProperty).IsInstalled
+$IEESUserValue = (Get-ItemProperty -Path $IEESUserKey -Name $IEESProperty).IsInstalled
+
+if ($IEESAdminValue -eq 1 -and $IEESUserValue -eq 1) {
+    $IEESScope = "Both"
+} elseif ($IEESAdminValue -eq 1){
+    $IEESScope = "Admins"
+} elseif ($IEESUserValue -eq 1){
+    $IEESScope = "Users"
+}
+
+if ($IEESScope) {
+    Write-Host "Internet Explorer Enhanced Security Configuration (ESC) is currently enabled." -ForegroundColor Yellow
+
+    Write-Host "Temporarily disabling ESC..." -ForegroundColor Cyan
+    Set-InternetExplorerESC -Scope $IEESScope -Action Disable
+}
+
+
 # Log current Content DB versions
 try {
     Write-Host "Logging pre-upgrade content database versions..." -ForegroundColor Yellow
@@ -895,14 +1015,40 @@ try {
 catch {
     Write-Warning "Failed to log pre-upgrade content DB info: $_"
 }
+#endregion
 
-# === STEP 1: Compare latest version online with installed current version ===
+
+#region === STEP 1: Compare latest version online with installed current version ===
 Write-Host "`n`tStep 1: Checking current installed Sharepoint Version..." -ForegroundColor Yellow
 $currentVersion = Get-SPVersion
 
+if ($SharePointEdition) {
+    $SharePointVersion = $SharePointEdition
+    Write-Host "Using user-provided Sharepoint edition: Sharepoint $SharePointVersion" -ForegroundColor Yellow
+} else {
+    if (-not $currentVersion.Edition) {
+        Write-Error "Could not determine SharePoint edition from farm version: $($currentVersion.FarmVersion)"
+        End-Script -exitCode 1
+    } else {
+        $SharePointVersion = $currentVersion.Edition
+        Write-Host "Sharepoint edition identified: Sharepoint $SharePointVersion" -ForegroundColor Yellow
+
+        do {
+            Write-Host "Is this correct? (Y/N)" -NoNewline
+            $Prompt1 = Read-Host " "
+            Write-Host "Answer: $Prompt1"
+        } Until ($Prompt1 -eq "Y" -or $Prompt1 -eq "N")
+
+        if ($Prompt1 -eq "N") {
+            Write-Host "Please re-run the script and select the correct Sharepoint version." -ForegroundColor Yellow
+            End-Script -exitCode 1
+        }
+    }
+}
+
 if ($currentVersion.InstalledVersion -eq $currentVersion.FarmVersion -and $currentVersion.FarmVersion -eq ($currentVersion.DatabaseVersion)[0].ToString() -and $currentDatabaseInfo.NeedsUpgrade -notcontains $true) {
     Write-Host "Checking latest Sharepoint version online..."
-    $latestVersion = Get-SPLatestPatch -Product '2016'
+    $latestVersion = Get-SPLatestPatch -Product $SharePointVersion
 
     Write-Host "Installed version: $($currentVersion.InstalledVersion)" -ForegroundColor Cyan
     Write-Host "Latest release version: $($latestVersion.Version[0])" -ForegroundColor Cyan
@@ -921,14 +1067,16 @@ if ($currentVersion.InstalledVersion -eq $currentVersion.FarmVersion -and $curre
     }
 
     if ($currentDatabaseInfo.NeedsUpgrade -contains $true) {
-        Write-Host "Following content databases needs upgrade: $($currentDatabaseInfo | Where-Object { $_.NeedsUpgrade -eq $true } | Select-Object -ExpandProperty Name -Join ', ')" -ForegroundColor Yellow
+        Write-Host "Following content databases needs upgrade: $(($currentDatabaseInfo | Where-Object { $_.NeedsUpgrade -eq $true } | Select-Object -ExpandProperty Name) -Join ', ')" -ForegroundColor Yellow
 
         if (-not $UpgradeOnly.IsPresent) {
             do {
-                $Prompt1 = Read-Host "Do you want the script to try upgrading the database(s)? (Y/N)" -ForegroundColor Cyan
-            } Until ($Prompt1 -eq "Y" -or $Prompt1 -eq "N")
+                Write-Host "Do you want the script to try upgrading the database(s)? (Y/N)" -NoNewline
+                $prompt2 = Read-Host " "
+                Write-Host "Answer: $prompt2"
+            } Until ($prompt2 -eq "Y" -or $prompt2 -eq "N")
 
-            if ($Prompt1 -eq "N") {
+            if ($prompt2 -eq "N") {
                 Write-Host "Please manually check that Sharepoint has previously been upgraded properly." -ForegroundColor Yellow
                 Write-Host "Current Installed Version: $($currentVersion.installedVersion)" -ForegroundColor Yellow
                 Write-Host "Current Farm Version: $($currentVersion.FarmVersion)" -ForegroundColor Yellow
@@ -936,23 +1084,30 @@ if ($currentVersion.InstalledVersion -eq $currentVersion.FarmVersion -and $curre
                 End-Script
             }
         }
+    } else {
+        Write-Warning "Please re-run this script in a new PowerShell window."
+        End-Script
     }
 }
+#endregion
 
-# === STEP 2: Download or browse patch file ===
-if (-not $UpgradeOnly.IsPresent -and $Prompt1 -ne "Y") {
+#region === STEP 2: Download or browse patch file ===
+if (-not $UpgradeOnly.IsPresent -and $prompt2 -ne "Y") {
     Write-Host "`n`tStep 2: Acquiring patch file..." -ForegroundColor Yellow
 
     if (-not $DownloadPatch.IsPresent) {
         do {
-            $Prompt2 = Read-Host "Automatically download and install latest patch file(s)? (Y/N)" -ForegroundColor Cyan
-        } Until ($Prompt2 -eq "Y" -or $Prompt2 -eq "N")
+            Write-Host "Do you want to automatically download the patch file(s)? (Y/N)" -NoNewline
+            $prompt3 = Read-Host " "
+            Write-Host "Answer: $prompt3"
+        } Until ($prompt3 -eq "Y" -or $prompt3 -eq "N")
     }
 
-    if ($DownloadPatch.IsPresent -or $Prompt2 -eq 'Y') {
+    if ($DownloadPatch.IsPresent -or $prompt3 -eq 'Y') {
         try {
             if ($latestVersion.Count -gt 0) {
                 $exeFiles = @()
+                $exeFolder = $patchPath
                 foreach ($patch in $latestVersion) {
                     $patchDownloadUrl = $patch.DownloadUrl
                     $patchFileName = $patch.FileName
@@ -963,9 +1118,14 @@ if (-not $UpgradeOnly.IsPresent -and $Prompt1 -ne "Y") {
                     $ProgressPreference = 'SilentlyContinue'
                     Invoke-WebRequest -Uri $patchDownloadUrl -OutFile $localFilePath -ErrorAction Stop
                     $ProgressPreference = 'Continue'
-                    Write-Host "Successfully downloaded to: $localFilePath" -ForegroundColor Green
 
-                    $exeFiles += $localFilePath
+                    if (-not (Test-Path $localFilePath)) {
+                        Write-Error "Download failed, file not found: $localFilePath"
+                        End-Script -exitCode 1
+                    } else {
+                        Write-Host "Successfully downloaded to: $localFilePath" -ForegroundColor Green
+                        $exeFiles += $localFilePath
+                    }
                 }
             } else {
                 Write-Warning "No patches found for SharePoint 2016."
@@ -977,25 +1137,22 @@ if (-not $UpgradeOnly.IsPresent -and $Prompt1 -ne "Y") {
         }
     } else {
         Write-Host "Skipping automatic download. Please choose patch file(s)..." -ForegroundColor Yellow
-        $exeFiles = Browse-File
+        #$exeFiles = Browse-File
+        $exeFolder = Browse-Folder
     }
 } else {
     Write-Host "Skipping patch download. Continuing with next step..." -ForegroundColor Yellow
 }
+#endregion
 
-# === STEP 3: Install patch file ===
-if ($Prompt2 -eq "Y" -or $DownloadPatch.IsPresent -and $Prompt1 -ne "Y") {
+#region === STEP 3: Install patch file ===
+if ($prompt3 -eq "Y" -or $DownloadPatch.IsPresent -and $prompt2 -ne "Y") {
     Write-Host "`n`tStep 3: Install patch file..." -ForegroundColor Yellow
     foreach ($file in $exeFiles) {
-        if (-not (Test-Path $file)) {
-            Write-Error "Patch file not found: $file"
-            End-Script -exitCode 1
-        }
-
         try {
             $returnExitCodes = @(0, 3010, 17022) # 0 = success, 3010 = reboot required, 17022 = patch already installed
             Write-Host "Installing patch $(Split-Path -Path $file -Leaf)..." -ForegroundColor Yellow
-            $exeInstall = Install-SPPatch -Path (Split-Path -Path $file -Parent) -Pause -SilentInstall -ErrorAction Stop
+            $exeInstall = Install-SPPatch -Path $exeFolder -Pause -SilentInstall -ErrorAction Stop
             Write-Host "Patch installed successfully." -ForegroundColor Green
 
             if ($exeInstall.RebootRequired) {
@@ -1005,6 +1162,9 @@ if ($Prompt2 -eq "Y" -or $DownloadPatch.IsPresent -and $Prompt1 -ne "Y") {
 
             if ($exeInstall.ExitCode -in $returnExitCodes -and $localFilePath) {
                 Remove-Item -Path $file -Force -Confirm:$false -ErrorAction SilentlyContinue
+            } else {
+                Write-Error "Unexpected exit code after install: $($exeInstall.ExitCode)"
+                End-Script -exitCode $exeInstall.ExitCode
             }
         }
         catch {
@@ -1024,117 +1184,40 @@ if ($Prompt2 -eq "Y" -or $DownloadPatch.IsPresent -and $Prompt1 -ne "Y") {
 
 if ($triggerReboot) {
     Register-ScheduledTask -TaskName $taskName -Description $taskDescription -Trigger $taskTrigger -Action $taskAction -Settings $taskSettings -User $(whoami) -RunLevel Highest
-    Write-Host "A reboot is required to complete the installation. Please restart the server and this script will automatically resume the upgrade next time this account '$env:USERDOMAIN\$env:USERNAME' logs in." -ForegroundColor Yellow
+    Write-Host "A reboot is required to complete the installation. This script will automatically resume the upgrade next time this account '$env:USERDOMAIN\$env:USERNAME' logs in after reboot." -ForegroundColor Yellow
 
     if (-not $DownloadPatch) {
         do {
-            $Prompt3 = Read-Host "Do you want to reboot now? (Y/N)" -ForegroundColor Cyan
-        } Until ($Prompt3 -eq "Y" -or $Prompt3 -eq "N")
+            Write-Host "Do you want to reboot now? (Y/N)" -NoNewline
+            $prompt4 = Read-Host " "
+            Write-Host "Answer: $prompt4"
+        } Until ($prompt4 -eq "Y" -or $prompt4 -eq "N")
 
-        if ($Prompt3 -eq "Y") {
+        if ($prompt4 -eq "Y") {
             Restart-Computer
         } else {
-            Write-Host "Please remember to reboot the server later." -ForegroundColor Yellow
+            Write-Host "Please remember to reboot the server to continue the upgrade." -ForegroundColor Yellow
+            Pause
+            End-Script
         }
     } else {
-        Restart-Computer
+        Write-Host "Server will reboot in a minute."
+        shutdown /r /t 60
+        End-Script
     }
 }
+#endregion
 
-
-# === STEP 4: Run psconfig.exe and upgrade content database if needed ===
+#region === STEP 4: Run psconfig.exe and upgrade content database if needed ===
 Write-Host "`n`tStep 4: Upgrading Sharepoint Farm..." -ForegroundColor Yellow
 Run-SPUpgrade
 
 Write-Host "SharePoint upgrade completed!" -ForegroundColor Yellow
 if ($prompt -eq "Y") {
-    Write-Host "Please re-run the script to check for new updates again." -ForegroundColor Yellow
+    Write-Host "Please re-run the script from a new window to check for new updates again." -ForegroundColor Yellow
 } else {
     Write-Host "Please manually verify that all content databases are up to date and that the farm is functioning correctly." -ForegroundColor Yellow
 }
-# === STEP 4: Upgrade content databases if needed ===
-<# try {
-    Write-Host "Step 2: Checking for content databases that need upgrade..."
-    $databasesNeedingUpgrade = Get-SPContentDatabase | Where-Object { $_.NeedsUpgrade -eq $true }
+#endregion
 
-    if ($databasesNeedingUpgrade.Count -gt 0) {
-        Write-Host "Found $($databasesNeedingUpgrade.Count) content database(s) requiring upgrade."
-
-        foreach ($db in $databasesNeedingUpgrade) {
-            Write-Host "Upgrading content DB: $($db.Name)"
-            Upgrade-SPContentDatabase -Identity $db -Confirm:$false
-        }
-
-        Write-Host "Content databases upgraded."
-    } else {
-        Write-Host "All content databases are already up to date."
-    }
-}
-catch {
-    Write-Error "Failed while upgrading content databases: $_"
-    Stop-Transcript
-    exit 1
-} #>
-
-
-# === STEP 3: Log post-upgrade DB state ===
-<# try {
-    Write-Host "Step 4: Logging post-upgrade content database versions..."
-    Get-SPContentDatabase -ErrorAction Stop | Select Name, Id, Server, NeedsUpgrade, Version | Format-List
-}
-catch {
-    Write-Warning "Failed to log post-upgrade content DB info: $_"
-}
- #>
-<# # === STEP 4: Check for pending reboot ===
-try {
-    $rebootKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"
-    if (Test-Path $rebootKey) {
-        Write-Warning "A system reboot is pending. Consider restarting this server."
-    } else {
-        Write-Host "No pending reboot detected."
-    }
-}
-catch {
-    Write-Warning "Could not determine reboot status."
-} #>
-
-<# # === STEP 5: Email the upgrade log ===
-try {
-    Write-Host "Sending upgrade log via email..."
-    Send-MailMessage -From $emailFrom -To $emailTo -Subject $emailSubject `
-        -Body "SharePoint farm upgrade completed. See attached log." `
-        -Attachments $logFile, $preUpgradeDbLog, $postUpgradeDbLog `
-        -SmtpServer $smtpServer
-
-    Write-Host "Email sent successfully to $emailTo"
-}
-catch {
-    Write-Warning "Failed to send email log: $_"
-} #>
-
-# === STEP 5: Final version validation ===
-<# try {
-    $currentVersion = Get-SPVersion
-
-    Write-Host ""
-    Write-Host "Final Version Validation:"
-    Write-Host "---------------------------------------------"
-    Write-Host "DLL Version (Microsoft.SharePoint.dll): $($currentVersion.InstalledVersion)"
-    Write-Host "Farm Build Version (Get-SPFarm):        $($currentVersion.FarmVersion)"
-    Write-Host "Content DB Build Version:               $($currentVersion.DatabaseVersion)"
-    Write-Host "---------------------------------------------"
-
-    if ($currentVersion.InstalledVersion -eq $currentVersion.FarmVersion -and $currentVersion.FarmVersion -eq $currentVersion.DatabaseVersion) {
-        Write-Host "SharePoint farm successfully upgraded to version $farmVersion."
-    } else {
-        Write-Warning "Version mismatch detected. "
-    }
-    Write-Host "Please verify that all content databases are up to date and that the farm is functioning correctly manually." -ForegroundColor Yellow
-}
-catch {
-    Write-Warning "Failed to retrieve version information: $_"
-} #>
-
-Stop-Transcript
 End-Script
