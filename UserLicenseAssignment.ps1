@@ -84,6 +84,61 @@ function UserHasLicenseAssignedFromThisGroup
 }
 
 
+
+
+
+function Get-MsolLicenseInfo{
+    [CmdletBinding()]
+    Param(
+        [Parameter(ValueFromPipeline)]
+        [Microsoft.Online.Administration.User]$user,
+        [string]$skuId
+    )
+
+    if ($skuId) {
+        $AllLicenses = $user.Licenses | ? AccountSkuId -contains $skuId
+    }else{
+        $AllLicenses = $user.Licenses
+    }
+
+    foreach ($license in $AllLicenses){
+
+        $DirectAssignment = $false
+
+        $Groups = @()
+
+        if($license.GroupsAssigningLicense.Count -ne 0){
+
+            $license.GroupsAssigningLicense | foreach {
+
+                if ($_ -ieq $user.ObjectId)
+                {
+                    $DirectAssignment = $true
+                }else{
+                    $Groups += "$((Get-MsolGroup -ObjectId $_).DisplayName) ($_)"
+                }
+            }
+
+        }else{
+            $DirectAssignment = $true
+        }
+
+
+        return [pscustomobject]@{
+            "Name"                  = $user.DisplayName
+            "UPN"                   = $user.UserPrincipalName
+            "PrimarySMTP"           = ($user.ProxyAddresses | where{$_ -cmatch "^SMTP\:"}) -replace "^SMTP\:"
+            "License"               = $license.AccountSkuId
+            "DirectAssignment"      = $DirectAssignment
+            "GroupsAssigningLicense" = $Groups
+        }
+    }
+}
+
+
+
+
+
 #produces a list of disabled service plan names for a set of plans we want to leave enabled
 function GetDisabledPlansForSKU
 {
