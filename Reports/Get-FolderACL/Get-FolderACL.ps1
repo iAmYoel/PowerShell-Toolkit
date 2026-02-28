@@ -9,33 +9,33 @@
 
 .COMPANYNAME Visolit Region Mitt AB
 
-.COPYRIGHT 
+.COPYRIGHT
 
 .TAGS NTFS Permission ACL Report
 
-.LICENSEURI 
+.LICENSEURI
 
-.PROJECTURI 
+.PROJECTURI
 
-.ICONURI 
+.ICONURI
 
-.EXTERNALMODULEDEPENDENCIES 
+.EXTERNALMODULEDEPENDENCIES
 
-.REQUIREDSCRIPTS 
+.REQUIREDSCRIPTS
 
-.EXTERNALSCRIPTDEPENDENCIES 
+.EXTERNALSCRIPTDEPENDENCIES
 
 .RELEASENOTES
 
 
 #>
 
-<# 
+<#
 
-.DESCRIPTION 
+.DESCRIPTION
  General script for creating a report of all the NTFS permissions on a folder structure.
 All you need is Admin privileges to run this script.
-    
+
 You have the following options,
 to provide with a search path for the target of the report, (Mandatory)
 to choose save format for export: ALL, CSV or XLSX
@@ -44,30 +44,34 @@ to skip the error logging,
 to show duration of the script.
 
 The save path for the export will default to script location with a default name if no path is provided.
-An error log is created as default if there are any errors, and exported to the export path. 
+An error log is created as default if there are any errors, and exported to the export path.
 
-#> 
+#>
 
 #Requires -RunAsAdministrator
 
 [Cmdletbinding()]
 Param(
 
-    [Parameter(Mandatory, HelpMessage = 'Path to search ACL in.')]
+    [Parameter(Mandatory = $true, HelpMessage = 'Path to search ACL in.')]
     [String]$Path,
 
+    [Parameter(Mandatory = $false, HelpMessage = 'SamAccountName of identites to only include')]
+    [String[]]$Identities = @(),
+
+    [Parameter(Mandatory = $false, HelpMessage = 'Search recursively in folder structure.')]
     [Switch]$Recurse,
 
-    [Parameter(HelpMessage = 'Save format for export file.')]
+    [Parameter(Mandatory = $false, HelpMessage = 'Save format for export file.')]
     [Validateset('CSV','XLSX','ALL')]$ExportFormat = "ALL",
 
-    [Parameter(HelpMessage = 'Save path for export file.')]
+    [Parameter(Mandatory = $false, HelpMessage = 'Save path for export file.')]
     [String]$ExportPath = (Split-Path -Parent $MyInvocation.MyCommand.Definition),
 
-    [Parameter(HelpMessage = "Add this parameter if you don't want an error log to be processed.")]
+    [Parameter(Mandatory = $false, HelpMessage = "Add this parameter if you don't want an error log to be processed.")]
     [Switch]$NoErrorLog,
 
-    [Parameter(HelpMessage = "Add this parameter if you want to show time elapsed.")]
+    [Parameter(Mandatory = $false, HelpMessage = "Add this parameter if you want to show time elapsed.")]
     [Switch]$ShowDuration
 
 )
@@ -81,27 +85,27 @@ $Date = Get-Date -Format yyyy-MM-dd_HHmm
 IF($ExportFormat -notlike "CSV"){
 
     # Check if ImportExcel module is imported, install module if it's not found.
-    IF (!(Get-Module ImportExcel)){          
-  
+    IF (!(Get-Module ImportExcel)){
+
         Try{
-            
+
             Write-Verbose "Installing module for xlsx export..." -Verbose
             Install-Module ImportExcel -Force -ErrorVariable +ErrorList -ErrorAction Stop -Verbose
             Import-Module ImportExcel -ErrorVariable +ErrorList -ErrorAction Stop -Verbose
 
         }Catch{
-            
+
             Write-Host $_ -ForegroundColor Red -BackgroundColor Black
             Write-Warning "Failed to install module!"
-            
+
             # If export format is ALL, continue script anyway with exportformat as CSV
             IF($ExportFormat -like "ALL"){
-            
+
                 Write-Verbose "Only exporting to csv"
                 $ExportFormat = "CSV"
-            
+
             }ELSE{
-                
+
                 Write-Verbose "Try this script again with another format."
                 Pause
                 Break
@@ -135,27 +139,28 @@ IF (($ExportPath -notlike "*.csv") -AND ($ExportPath -notlike "*.xlsx")){
         Break
 
     }ELSE{
-    
+
         Write-Verbose "Export Path found!"
-    
+
     }
 
     $CSVExportPath = Join-Path -Path $ExportPath -ChildPath "FolderACL_$Date.csv"
     $XLSXExportPath = Join-Path -Path $ExportPath -ChildPath "FolderACL_$Date.xlsx"
 
 }ELSE{
-    
+
     IF(!(Test-Path (Split-Path -Parent $ExportPath) -PathType Container )){
 
         Throw 'Export folder path not found.'
         Break
 
-    }ELSE{
+    }ELSE{
+
         Write-Verbose "Export Path found!"
 
         $CSVExportPath = $ExportPath -replace ".xlsx$",".csv"
         $XLSXExportPath = $ExportPath -replace ".csv$",".xlsx"
-    
+
     }
 }
 
@@ -234,9 +239,9 @@ Function Get-ACLPropagation{
         $AppliedToCheck = @(Compare-Object -ReferenceObject $Flags -DifferenceObject $Propagation.Flags -Verbose).Length -eq 0
 
         IF($AppliedToCheck){
-            
+
             $Propagation.Message
-    
+
         }
     }
 }
@@ -291,10 +296,10 @@ IF($Recurse){
 
     # Get permissions from child folders
     Get-ChildItem -Directory -Path $Path -Recurse -Force -OutVariable ChildFoldersPath -ErrorVariable +ErrorList | ForEach-Object{
-    
+
         #region Progress bar
         IF($ShowDuration){
-        
+
             # Create variable for time elapsed
             $WriteTime = ([string]::Format("Time Elapsed: {0:d2}:{1:d2}:{2:d2}", $elapsedTime.Elapsed.hours, $elapsedTime.Elapsed.minutes, $elapsedTime.Elapsed.seconds))
 
@@ -306,16 +311,16 @@ IF($Recurse){
             }
 
         }ELSE{
-    
+
             # Create arguments for write-progress without time elapsed.
             $Progress = @{
                 Activity = "Step 1 of $($AllSteps): Fetching folders."
                 Status = "Processed $i folders."
-            }    
-    
+            }
+
         }
 
-        Write-Progress @Progress 
+        Write-Progress @Progress
         $i++
         #endregion
     }
@@ -323,10 +328,10 @@ IF($Recurse){
 
     # Get permissions from child folders
     Get-ChildItem -Directory -Path $Path -Force -OutVariable ChildFoldersPath -ErrorVariable +ErrorList | ForEach-Object{
-    
+
         #region Progress bar
         IF($ShowDuration){
-        
+
             # Create variable for time elapsed
             $WriteTime = ([string]::Format("Time Elapsed: {0:d2}:{1:d2}:{2:d2}", $elapsedTime.Elapsed.hours, $elapsedTime.Elapsed.minutes, $elapsedTime.Elapsed.seconds))
 
@@ -338,16 +343,16 @@ IF($Recurse){
             }
 
         }ELSE{
-    
+
             # Create arguments for write-progress without time elapsed.
             $Progress = @{
                 Activity = "Step 1 of $($AllSteps): Fetching folders."
                 Status = "Processed $i folders."
-            }    
-    
+            }
+
         }
 
-        Write-Progress @Progress 
+        Write-Progress @Progress
         $i++
         #endregion
     }
@@ -372,15 +377,15 @@ Write-Output "Processing folders..."
 
 # Start processing every folder
 Foreach ($Folder in $FolderPath) {
-    
+
     #region Progress bar
 
     # Set up progress bar
 	$i++
 	$status = "{0:N0}" -f ($i / $tot * 100)
-    
+
     IF($ShowDuration){
-        
+
         # Create variable for time elapsed
         $WriteTime = ([string]::Format("Time Elapsed: {0:d2}:{1:d2}:{2:d2}", $elapsedTime.Elapsed.hours, $elapsedTime.Elapsed.minutes, $elapsedTime.Elapsed.seconds))
 
@@ -393,22 +398,22 @@ Foreach ($Folder in $FolderPath) {
         }
 
     }ELSE{
-        
+
         # Create arguments for write-progress without time elapsed.
         $Progress = @{
             Activity = "Step 2 of $($AllSteps): Exporting folder permissions."
             Status = "Processing folder $i of $tot : $status% Completed"
             PercentComplete = ($i / $tot * 100)
-        }    
-    
+        }
+
     }
 
-    Write-Progress @Progress 
+    Write-Progress @Progress
     #endregion
 
 
     Write-Verbose "Processing $($Folder.FullName)"
-    
+
     # Clear variables
     Clear-Variable -Name ACL,AccessRights,FolderInheritance,AccessAppliedTo,Properties -ErrorAction SilentlyContinue
 
@@ -417,18 +422,31 @@ Foreach ($Folder in $FolderPath) {
 
     # Start processing every acl for folder.
     foreach ($Access in $ACL.Access){
-        
+        Clear-Variable -Name matched -ErrorAction SilentlyContinue
+
+        # If identity filter is provided
+        if ($Identities) {
+            $Identities | foreach {
+                if ($access.IdentityReference.Value -match $_) {
+                    $matched = $true
+                }
+            }
+            if (!$matched) {
+                Continue
+            }
+        }
+
         # If user access is masked with numbers.
         IF ($Access.FileSystemRights -match '\d+'){
-                
+
             # Translate permission using the access mask and set variable for translated permissions.
             $AccessRights = (($AccessMask.Keys | Where-Object { $Access.FileSystemRights.value__ -band $_ } | ForEach-Object { $AccessMask[$_] } | Out-String).Trim()) -replace "`n",", "
-            
+
         }ELSE {
-            
+
             # Set variable for permissions.
             $AccessRights = $Access.FileSystemRights
-            
+
         }
 
         # Get folder inheritance setting
@@ -437,19 +455,19 @@ Foreach ($Folder in $FolderPath) {
             $FolderInheritance = "Disabled"
 
         }ELSE{
-        
+
             $FolderInheritance = "Enabled"
-        
+
         }
-        
+
         # Use created function to get propagation.
         $AccessAppliedTo = Get-ACLPropagation -ACLAccessObject $Access -PropagationRules $PropagationRules
 
-        # 
+        #
         IF ($AccessRights){
 
             # Create hash table and add values.
-            $Properties = [ordered]@{'Folder Name'=$Folder.FullName;'User/Group'=$Access.IdentityReference;'Permissions'=$AccessRights;'Type'=$Access.AccessControlType;'Applies to'=$AccessAppliedTo;'Permission Inherited'=$Access.IsInherited;'Folder inheritance'=$FolderInheritance}
+            $Properties = [ordered]@{'Folder Name'=$Folder.FullName;'Identity'=$Access.IdentityReference;'Permissions'=$AccessRights;'Type'=$Access.AccessControlType;'Applies to'=$AccessAppliedTo;'Permission Inherited'=$Access.IsInherited;'Folder inheritance'=$FolderInheritance}
 
             # Add hash table to csv array.
             $Report += New-Object -TypeName PSObject -Property $Properties
@@ -477,7 +495,7 @@ IF($ExportFormat -notlike "XLSX"){
 
 #Export result to xslx.
 IF($ExportFormat -notlike "CSV"){
-    
+
     $Report | Export-Excel -Path $XLSXExportPath -WorksheetName "Report" -AutoSize -FreezeTopRow -BoldTopRow -TableName Report -ErrorVariable +ErrorList -ErrorAction Stop
     Write-Verbose "XLSX export path: $XLSXExportPath"
 
@@ -495,7 +513,7 @@ IF($NoErrorLog){
     Write-Output "Export successfully completed!"
 
     IF($ShowDuration){
-        
+
         # Create variable for time elapsed
         $WriteTime = ([string]::Format("{0:d2}:{1:d2}:{2:d2}", $elapsedTime.Elapsed.hours, $elapsedTime.Elapsed.minutes, $elapsedTime.Elapsed.seconds))
         Write-Output "Script duration: $WriteTime"
@@ -514,14 +532,14 @@ IF($NoErrorLog){
 
     # Process every error
     Foreach ($ErrorItem in $ErrorList){
-    
+
         # Set up progress bar
 	    $i++
 	    $status = "{0:N0}" -f ($i / $tot * 100)
-        
+
         # If ShowDuration parameter is used
         IF($ShowDuration){
-            
+
             # Create variable for time elapsed
             $WriteTime = ([string]::Format("Time Elapsed: {0:d2}:{1:d2}:{2:d2}", $elapsedTime.Elapsed.hours, $elapsedTime.Elapsed.minutes, $elapsedTime.Elapsed.seconds))
 
@@ -531,37 +549,37 @@ IF($NoErrorLog){
 
         # Create hash table and add values.
         $ErrorProperties = [ordered]@{'Command'=$ErrorItem.CategoryInfo.Activity;'Folder Name'=$ErrorItem.CategoryInfo.TargetName;'Category'=$ErrorItem.CategoryInfo.Category;'Reason'=$ErrorItem.CategoryInfo.Reason;'Message'=$ErrorItem.Exception.Message}
-    
+
         # Add hash table to csv array.
         $ErrorLog += New-Object -TypeName PSObject -Property $ErrorProperties
     }
 
     # If ErrorLog parameter is used
     if ($ErrorLog){
-        
+
         # Export Error list to csv.
         Write-Output "Export completed with errors! Exporting error log to csv."
-        
+
         IF ($ExportFormat -notlike "XLSX"){
 
             $CSVErrorExportPath = $CSVExportPath -replace '.csv','_ErrorLog.csv'
             $ErrorLog | Export-Csv -Path $CSVErrorExportPath -Delimiter ";" -Encoding UTF8 -NoTypeInformation -Force
             Write-Verbose "CSV Error export path: $CSVErrorExportPath"
-        
+
         }
 
         IF ($ExportFormat -notlike "CSV"){
-        
+
             $XLSXErrorExportPath = $XLSXExportPath -replace '.xlsx','_ErrorLog.xlsx'
             $ErrorLog | Export-Excel -Path $XLSXErrorExportPath -WorksheetName "ErrorLog" -AutoSize -FreezeTopRow -BoldTopRow -TableName ErrorLog
-            Write-Verbose "XLSX Error export path: $XLSXErrorExportPath"            
-        
+            Write-Verbose "XLSX Error export path: $XLSXErrorExportPath"
+
         }
-        
+
 
         # If ShowDuration parameter is used
         IF($ShowDuration){
-            
+
             # Create variable for time elapsed
             $WriteTime = ([string]::Format("{0:d2}:{1:d2}:{2:d2}", $elapsedTime.Elapsed.hours, $elapsedTime.Elapsed.minutes, $elapsedTime.Elapsed.seconds))
             Write-Output "Script duration: $WriteTime"
@@ -577,14 +595,14 @@ IF($NoErrorLog){
 
         # If ShowDuration parameter is used
         IF($ShowDuration){
-            
+
             # Create variable for time elapsed
             $WriteTime = ([string]::Format("{0:d2}:{1:d2}:{2:d2}", $elapsedTime.Elapsed.hours, $elapsedTime.Elapsed.minutes, $elapsedTime.Elapsed.seconds))
             Write-Output "Script duration: $WriteTime"
 
             # Stop clock for time elapsed
             $ElapsedTime.stop()
-        
+
         }
     }
 }
