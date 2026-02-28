@@ -1,0 +1,363 @@
+﻿{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "type": "string",
+            "defaultValue": "{0}"
+        },
+        "networkInterfaceName": {
+            "type": "string",
+            "defaultValue": "{1}-img-nic01"
+        },
+        "subnetName": {
+            "type": "string",
+            "defaultValue": "{2}"
+        },
+        "virtualNetworkId": {
+            "type": "string",
+            "defaultValue": "{3}"
+        },
+        "publicIpAddressName": {
+            "type": "string",
+            "defaultValue": "{1}-img-pip"
+        },
+        "publicIpAddressType": {
+            "type": "string",
+            "defaultValue": "dynamic"
+        },
+        "publicIpAddressSku": {
+            "type": "string",
+            "defaultValue": "Basic"
+        },
+        "pipDeleteOption": {
+            "type": "string",
+            "defaultValue": "Delete"
+        },
+        "virtualMachineName": {
+            "type": "string",
+            "defaultValue": "{1}-img"
+        },
+        "virtualMachineComputerName": {
+            "type": "string",
+            "defaultValue": "{1}-img"
+        },
+        "osDiskType": {
+            "type": "string",
+            "allowedValues": [
+                "default",
+                "Standard_LRS",
+                "StandardSSD_LRS",
+                "Premium_LRS"
+            ],
+            "defaultValue": "StandardSSD_LRS"
+        },
+        "osDiskDeleteOption": {
+            "type": "string",
+            "defaultValue": "Delete"
+        },
+        "dataDisksType": {
+            "type": "string",
+            "allowedValues": [
+                "default",
+                "Standard_LRS",
+                "StandardSSD_LRS",
+                "Premium_LRS"
+            ],
+            "defaultValue": "default"
+        },
+        "keyVaultName": {
+            "type": "string",
+            "defaultValue": ""
+        },
+        "secretName": {
+            "type": "string",
+            "defaultValue": ""
+        },
+        "dataDisks": {
+            "type": "array",
+            "defaultValue": [
+                {
+                    "lun": 0,
+                    "createOption": "fromImage",
+                    "deleteOption": "Delete",
+                    "caching": "None",
+                    "writeAcceleratorEnabled": false,
+                    "id": null,
+                    "name": null,
+                    "storageAccountType": "StandardSSD_LRS",
+                    "diskSizeGB": null,
+                    "diskEncryptionSet": null
+                }
+            ]
+        },
+        "imageVersion": {
+            "type": "string",
+            "metadata": {
+                "description": "The image version of the template"
+            }
+        },
+        "virtualMachineSize": {
+            "type": "string",
+            "defaultValue": "Standard_B2ms"
+        },
+        "nicDeleteOption": {
+            "type": "string",
+            "defaultValue": "Delete"
+        },
+        "adminUsername": {
+            "type": "string",
+            "defaultValue": "adminuser"
+        },
+        "patchMode": {
+            "type": "string",
+            "defaultValue": "Manual"
+        },
+        "enableHotpatching": {
+            "type": "bool",
+            "defaultValue": false
+        }
+    },
+    "variables": {
+        "vnetId": "[parameters('virtualNetworkId')]",
+        "subnetRef": "[concat(variables('vnetId'), '/subnets/', parameters('subnetName'))]",
+        "imageReference": "{4}",
+        "pipFqdn": "[concat(parameters('VirtualMachineName'), '.westeurope.cloudapp.azure.com')]"
+    },
+    "resources": [
+        {
+            "name": "[parameters('networkInterfaceName')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2021-03-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/publicIpAddresses/', parameters('publicIpAddressName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "subnet": {
+                                "id": "[variables('subnetRef')]"
+                            },
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIpAddress": {
+                                "id": "[resourceId(resourceGroup().name, 'Microsoft.Network/publicIpAddresses', parameters('publicIpAddressName'))]",
+                                "properties": {
+                                    "deleteOption": "[parameters('pipDeleteOption')]"
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[parameters('publicIpAddressName')]",
+            "type": "Microsoft.Network/publicIpAddresses",
+            "apiVersion": "2020-08-01",
+            "location": "[parameters('location')]",
+            "properties": {
+                "publicIpAllocationMethod": "[parameters('publicIpAddressType')]",
+                "dnsSettings": {
+                    "domainNameLabel": "[parameters('virtualMachineName')]",
+                    "fqdn": "[variables('pipFqdn')]"
+                }
+            },
+            "sku": {
+                "name": "[parameters('publicIpAddressSku')]"
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "[parameters('virtualMachineName')]",
+            "properties": {
+                "mode": "Incremental",
+                "expressionEvaluationOptions": {
+                "scope": "inner"
+                },
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "location": {
+                            "type": "string"
+                        },
+                        "networkInterfaceName": {
+                            "type": "string"
+                        },
+                        "virtualMachineName": {
+                            "type": "string"
+                        },
+                        "virtualMachineComputerName": {
+                            "type": "string"
+                        },
+                        "osDiskType": {
+                            "type": "string"
+                        },
+                        "osDiskDeleteOption": {
+                            "type": "string"
+                        },
+                        "dataDisks": {
+                            "type": "object"
+                        },
+                        "dataDisksType": {
+                            "type": "string"
+                        },
+                        "virtualMachineSize": {
+                            "type": "string"
+                        },
+                        "nicDeleteOption": {
+                            "type": "string"
+                        },
+                        "adminUsername": {
+                            "type": "string"
+                        },
+                        "adminPassword": {
+                            "type": "secureString"
+                        },
+                        "patchMode": {
+                            "type": "string"
+                        },
+                        "enableHotpatching": {
+                            "type": "bool"
+                        },
+                        "imageReference": {
+                            "type": "string"
+                        }
+                    },
+                    "resources": [
+                        {
+                            "name": "[parameters('virtualMachineName')]",
+                            "type": "Microsoft.Compute/virtualMachines",
+                            "apiVersion": "2022-03-01",
+                            "location": "[parameters('location')]",
+                            "dependsOn": [
+                                "[concat('Microsoft.Network/networkInterfaces/', parameters('networkInterfaceName'))]"
+                            ],
+                            "properties": {
+                                "hardwareProfile": {
+                                    "vmSize": "[parameters('virtualMachineSize')]"
+                                },
+                                "storageProfile": {
+                                    "osDisk": {
+                                        "createOption": "fromImage",
+                                        "managedDisk": {
+                                            "storageAccountType": "[parameters('osDiskType')]"
+                                        },
+                                        "deleteOption": "[parameters('osDiskDeleteOption')]"
+                                    },
+                                    "imageReference": {
+                                        "id": "[parameters('imageReference')]"
+                                    },
+                                    "copy": [
+                                        {
+                                            "name": "dataDisks",
+                                            "count": "[length(parameters('dataDisks').storageProfile.dataDiskImages)]",
+                                            "input": {
+                                                "lun": "[parameters('dataDisks').storageProfile.dataDiskImages[copyIndex('dataDisks')].lun]",
+                                                "createOption": "fromImage",
+                                                "caching": "[parameters('dataDisks').storageProfile.dataDiskImages[copyIndex('dataDisks')].hostCaching]",
+                                                "diskSizeGB": "[parameters('dataDisks').storageProfile.dataDiskImages[copyIndex('dataDisks')].sizeInGB]",
+                                                "managedDisk": {
+                                                    "id": "[coalesce(parameters('dataDisks')[copyIndex('dataDisks')].id, if(equals(parameters('dataDisks')[copyIndex('dataDisks')].name, json('null')), json('null'), resourceId('Microsoft.Compute/disks', parameters('dataDisks')[copyIndex('dataDisks')].name)))]",
+                                                    "storageAccountType": "[if(equals(parameters('dataDisksType'), 'default'), parameters('dataDisks').publishingProfile.storageAccountType, parameters('dataDisksType'))]"
+                                                },
+                                                "deleteOption": "delete",
+                                                "writeAcceleratorEnabled": false
+                                            }
+                                        }
+                                    ]
+                                },
+                                "networkProfile": {
+                                    "networkInterfaces": [
+                                        {
+                                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaceName'))]",
+                                            "properties": {
+                                                "deleteOption": "[parameters('nicDeleteOption')]"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "osProfile": {
+                                    "computerName": "[parameters('virtualMachineComputerName')]",
+                                    "adminUsername": "[parameters('adminUsername')]",
+                                    "adminPassword": "[parameters('adminPassword')]",
+                                    "windowsConfiguration": {
+                                        "enableAutomaticUpdates": false,
+                                        "provisionVmAgent": true,
+                                        "patchSettings": {
+                                            "enableHotpatching": "[parameters('enableHotpatching')]",
+                                            "patchMode": "[parameters('patchMode')]"
+                                        }
+                                    }
+                                },
+                                "licenseType": "Windows_Client"
+                            }
+                        }
+                    ]
+                },
+                "parameters": {
+                    "location": {
+                        "value": "[parameters('location')]"
+                    },
+                    "networkInterfaceName": {
+                        "value": "[parameters('networkInterfaceName')]"
+                    },
+                    "virtualMachineName": {
+                        "value": "[parameters('virtualMachineName')]"
+                    },
+                    "virtualMachineComputerName": {
+                        "value": "[parameters('virtualMachineComputerName')]"
+                    },
+                    "osDiskType": {
+                        "value": "[parameters('osDiskType')]"
+                    },
+                    "osDiskDeleteOption": {
+                        "value": "[parameters('osDiskDeleteOption')]"
+                    },
+                    "imageReference": {
+                        "value": "[variables('imageReference')]"
+                    },
+                    "dataDisks": {
+                        "value": ""
+                    },
+                    "dataDisksType": {
+                        "value": "[parameters('dataDisksType')]"
+                    },
+                    "virtualMachineSize": {
+                        "value": "[parameters('virtualMachineSize')]"
+                    },
+                    "nicDeleteOption": {
+                        "value": "[parameters('nicDeleteOption')]"
+                    },
+                    "adminUsername": {
+                        "value": "[parameters('adminUsername')]"
+                    },
+                    "adminPassword": {
+                        "reference": {
+                            "keyVault": {
+                                "id": "[resourceId(resourceGroup().name, 'Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+                            },
+                            "secretName": "[parameters('secretName')]"
+                        }
+                    },
+                    "patchMode": {
+                        "value": "[parameters('patchMode')]"
+                    },
+                    "enableHotpatching": {
+                        "value": "[parameters('enableHotpatching')]"
+                    }
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "adminUsername": {
+            "type": "string",
+            "value": "[parameters('adminUsername')]"
+        }
+    }
+}
