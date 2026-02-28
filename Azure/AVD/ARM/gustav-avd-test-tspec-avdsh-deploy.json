@@ -1,0 +1,476 @@
+﻿{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "hostpoolName": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of the Hostpool to be created."
+            },
+            "defaultValue": "gustav-avd-test-hp01"
+        },
+        "hostpoolResourceGroup": {
+            "type": "string",
+            "metadata": {
+                "description": "The resource group of the host pool to be updated. Used when the host pool was created empty."
+            },
+            "defaultValue": "gustav-avd-test"
+        },
+        "hostpoolLocation": {
+            "type": "string",
+            "metadata": {
+                "description": "The location of the host pool to be updated. Used when the host pool was created empty."
+            },
+            "defaultValue": "westeurope"
+        },
+        "vmTemplateName": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of the customvm template."
+            },
+            "defaultValue": "gustav-avd-test-tspec-linked-customvm"
+        },
+        "vmTemplateVersion": {
+            "type": "string",
+            "metadata": {
+                "description": "The version of the customvm template."
+            },
+            "defaultValue": "1.1"
+        },
+        "administratorDomainUsername": {
+            "type": "string",
+            "metadata": {
+                "description": "A username in the domain that has privileges to join the session hosts to the domain. For example, 'vmjoiner@contoso.com'."
+            },
+            "defaultValue": "svc.gustav.aadds.vmjoiner.rts.01.z@funet.onmicrosoft.com"
+        },
+        "administratorDomainPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "The password that corresponds to the existing domain username."
+            }
+        },
+        "vmAdministratorAccountUsername": {
+            "type": "string",
+            "metadata": {
+                "description": "A username to be used as the virtual machine administrator account. The vmAdministratorAccountUsername and  vmAdministratorAccountPassword parameters must both be provided. Otherwise, domain administrator credentials provided by administratorDomainUsername and administratorDomainPassword will be used."
+            },
+            "defaultValue": "adminuser"
+        },
+        "vmAdministratorAccountPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "The password associated with the virtual machine administrator account. The vmAdministratorAccountUsername and  vmAdministratorAccountPassword parameters must both be provided. Otherwise, domain administrator credentials provided by administratorDomainUsername and administratorDomainPassword will be used."
+            }
+        },
+        "vmResourceGroup": {
+            "type": "string",
+            "metadata": {
+                "description": "The resource group of the session host VMs."
+            },
+            "defaultValue": "gustav-avd-test"
+        },
+        "vmLocation": {
+            "type": "string",
+            "metadata": {
+                "description": "The location of the session host VMs."
+            },
+            "defaultValue": "westeurope"
+        },
+        "vmSize": {
+            "type": "string",
+            "metadata": {
+                "description": "The size of the session host VMs."
+            },
+            "defaultValue": "Standard_D4s_v3"
+        },
+        "vmInitialNumber": {
+            "type": "int",
+            "metadata": {
+                "description": "VM name prefix initial number."
+            },
+            "defaultValue": 0
+        },
+        "vmNumberOfInstances": {
+            "type": "int",
+            "metadata": {
+                "description": "Number of session hosts that will be created and added to the hostpool."
+            },
+            "defaultValue": 1
+        },
+        "vmNamePrefix": {
+            "type": "string",
+            "metadata": {
+                "description": "This prefix will be used in combination with the VM number to create the VM name. If using 'rdsh' as the prefix, VMs would be named 'rdsh-0', 'rdsh-1', etc. You should use a unique prefix to reduce name collisions in Active Directory."
+            },
+            "defaultValue": "gustav-avdt"
+        },
+        "vnetResourceGroupName": {
+            "type": "string",
+            "metadata": {
+                "description": "The resource group containing the existing virtual network."
+            },
+            "defaultValue": "gustav-test"
+        },
+        "existingVnetName": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of the virtual network the VMs will be connected to."
+            },
+            "defaultValue": "gustav-test-vnet"
+        },
+        "existingSubnetName": {
+            "type": "string",
+            "metadata": {
+                "description": "The subnet the VMs will be placed in."
+            },
+            "defaultValue": "gustav-test-avd-snet"
+        },
+        "wvdApiVersion": {
+            "type": "string",
+            "metadata": {
+                "description": "WVD api version"
+            },
+            "defaultValue": "2019-12-10-preview"
+        },
+        "utcValue": {
+            "type": "string",
+            "defaultValue": "[utcNow('u')]"
+        }
+    },
+    "variables": {
+        "utcTime": "[dateTimeAdd(parameters('utcValue'), 'PT2H')]",
+        "artifactsLocation": "https://wvdportalstorageblob.blob.core.windows.net/galleryartifacts/Configuration_09-08-2022.zip",
+        "hostpoolProperties": {
+            "friendlyName": "Gustav AVD Test",
+            "description": "Created through the Azure Virtual Desktop extension. AVD RemoteApp for Gustav applikation test environment.\n\nCreated and configured by RTS.",
+            "hostPoolType": "Pooled",
+            "personalDesktopAssignmentType": null,
+            "applicationGroupReferences": [
+                "/subscriptions/2b2a73c0-4a8e-40bf-800f-2729db364129/resourcegroups/gustav-avd-test/providers/Microsoft.DesktopVirtualization/applicationgroups/gustav-avd-test-hp01-ag-gustav",
+                "/subscriptions/2b2a73c0-4a8e-40bf-800f-2729db364129/resourcegroups/gustav-avd-test/providers/Microsoft.DesktopVirtualization/applicationgroups/gustav-avd-test-hp01-DAG"
+            ],
+            "customRdpProperty": "drivestoredirect:s:*;audiomode:i:0;videoplaybackmode:i:1;redirectclipboard:i:1;redirectprinters:i:1;devicestoredirect:s:*;redirectcomports:i:1;redirectsmartcards:i:1;usbdevicestoredirect:s:*;enablecredsspsupport:i:1;redirectwebauthn:i:1;use multimon:i:1;",
+            "maxSessionLimit": 25,
+            "loadBalancerType": "BreadthFirst",
+            "validationEnvironment": true,
+            "ring": null,
+            "registrationInfo": {
+                "expirationTime": "[variables('utcTime')]",
+                "registrationTokenOperation": "Update"
+            },
+            "vmTemplate": "{\"domain\":\"funet.onmicrosoft.com\",\"galleryImageOffer\":null,\"galleryImagePublisher\":null,\"galleryImageSKU\":null,\"imageType\":\"CustomImage\",\"customImageId\":\"/subscriptions/2b2a73c0-4a8e-40bf-800f-2729db364129/resourceGroups/gustav-avd-test/providers/Microsoft.Compute/galleries/GustavAVDTestGallery/images/GustavTestAVD01/versions/1.0.0\",\"namePrefix\":\"gustav-avdt\",\"osDiskType\":\"StandardSSD_LRS\",\"vmSize\":{\"id\":\"Standard_D4s_v3\",\"cores\":4,\"ram\":16,\"rdmaEnabled\":false,\"supportsMemoryPreservingMaintenance\":true},\"galleryItemId\":null,\"hibernate\":false,\"diskSizeGB\":0}",
+            "preferredAppGroupType": "Desktop",
+            "migrationRequest": null,
+            "cloudPcResource": false,
+            "startVMOnConnect": false,
+            "ssoadfsAuthority": null,
+            "ssoClientId": null,
+            "ssoClientSecretKeyVaultPath": null,
+            "ssoSecretType": null,
+            "objectId": "04ec6f2f-68fc-4035-af21-8d649c4e027c"
+        },
+        "availabilityOption": "None",
+        "availabilitySetName": "",
+        "createAvailabilitySet": false,
+        "availabilitySetUpdateDomainCount": 5,
+        "availabilitySetFaultDomainCount": 2,
+        "availabilityZones": [],
+        "vmDiskSizeGB": 0,
+        "vmHibernate": false,
+        "vmGalleryImageOffer": "",
+        "vmGalleryImagePublisher": "",
+        "vmGalleryImageSKU": "",
+        "vmGalleryImageVersion": "",
+        "vmGalleryImageHasPlan": false,
+        "vmCustomImageSourceId": "/subscriptions/2b2a73c0-4a8e-40bf-800f-2729db364129/resourceGroups/gustav-avd-test/providers/Microsoft.Compute/galleries/GustavAVDTestGallery/images/GustavTestAVD01",
+        "vmDiskType": "Premium_LRS",
+        "createNetworkSecurityGroup": false,
+        "networkSecurityGroupId": "",
+        "networkSecurityGroupRules": [],
+        "availabilitySetTags": {
+            "Application": "Gustav",
+            "Environment": "Test"
+        },
+        "networkInterfaceTags": {
+            "Application": "Gustav",
+            "Environment": "Test"
+        },
+        "networkSecurityGroupTags": {
+            "Application": "Gustav",
+            "Environment": "Test"
+        },
+        "virtualMachineTags": {
+            "Application": "Gustav",
+            "Environment": "Test"
+        },
+        "imageTags": {
+            "Application": "Gustav",
+            "Environment": "Test"
+        },
+        "deploymentId": "",
+        "ouPath": "OU=AVD,OU=Servers,OU=Test,OU=gustav,OU=folkuni,DC=aadds,DC=folkuni,DC=se",
+        "domain": "aadds.folkuni.se",
+        "aadJoin": false,
+        "intune": false,
+        "bootDiagnostics": {
+            "enabled": true
+        },
+        "userAssignedIdentity": "",
+        "customConfigurationTemplateUrl": "",
+        "customConfigurationParameterUrl": "",
+        "systemData": {
+            "hostpoolUpdateFeature": false,
+            "aadJoinPreview": false,
+            "sessionHostConfigurationVersion": ""
+        },
+        "securityType": "Standard",
+        "secureBoot": false,
+        "vTPM": false,
+        "rdshPrefix": "[concat(parameters('vmNamePrefix'),'-')]",
+        "vhds": "[concat('vhds','/', variables('rdshPrefix'))]",
+        "subnet-id": "[resourceId(parameters('vnetResourceGroupName'),'Microsoft.Network/virtualNetworks/subnets',parameters('existingVnetName'), parameters('existingSubnetName'))]",
+        "vmTemplateRG": "gustav-avd-test",
+        "vmTemplateName": "[parameters('vmTemplateName')]",
+        "vmTemplateVersion": "[parameters('vmTemplateVersion')]",
+        "rdshVmNamesOutput": {
+            "copy": [
+                {
+                    "name": "rdshVmNamesCopy",
+                    "count": "[parameters('vmNumberOfInstances')]",
+                    "input": {
+                        "name": "[concat(variables('rdshPrefix'), add(parameters('vmInitialNumber'), copyIndex('rdshVmNamesCopy')))]"
+                    }
+                }
+            ]
+        }
+    },
+    "resources": [
+        {
+            "apiVersion": "2018-05-01",
+            "name": "[concat('UpdateHostPool-', variables('deploymentId'))]",
+            "type": "Microsoft.Resources/deployments",
+            "resourceGroup": "[parameters('hostpoolResourceGroup')]",
+            "condition": "[not(empty(parameters('hostpoolResourceGroup')))]",
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "name": "[parameters('hostpoolName')]",
+                            "apiVersion": "[parameters('wvdApiVersion')]",
+                            "location": "[parameters('hostpoolLocation')]",
+                            "type": "Microsoft.DesktopVirtualization/hostpools",
+                            "properties": "[variables('hostpoolProperties')]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "apiVersion": "2018-05-01",
+            "name": "[concat('AVSet-linkedTemplate-', variables('deploymentId'))]",
+            "type": "Microsoft.Resources/deployments",
+            "resourceGroup": "[parameters('vmResourceGroup')]",
+            "condition": "[and(equals(variables('availabilityOption'), 'AvailabilitySet'), variables('createAvailabilitySet'))]",
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "apiVersion": "2018-10-01",
+                            "type": "Microsoft.Compute/availabilitySets",
+                            "name": "[variables('availabilitySetName')]",
+                            "location": "[parameters('vmLocation')]",
+                            "tags": "[variables('availabilitySetTags')]",
+                            "properties": {
+                                "platformUpdateDomainCount": "[variables('availabilitySetUpdateDomainCount')]",
+                                "platformFaultDomainCount": "[variables('availabilitySetFaultDomainCount')]"
+                            },
+                            "sku": {
+                                "name": "Aligned"
+                            }
+                        }
+                    ]
+                }
+            },
+            "dependsOn": [
+                "[concat('UpdateHostPool-', variables('deploymentId'))]"
+            ]
+        },
+        {
+            "apiVersion": "2020-06-01",
+            "name": "[concat('vmCreation-linkedTemplate-', variables('deploymentId'))]",
+            "resourceGroup": "[parameters('vmResourceGroup')]",
+            "dependsOn": [
+                "[concat('AVSet-linkedTemplate-', variables('deploymentId'))]"
+            ],
+            "type": "Microsoft.Resources/deployments",
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "id": "[resourceId(variables('vmTemplateRG'), 'Microsoft.Resources/templateSpecs/versions', variables('vmTemplateName'), variables('vmTemplateVersion'))]"
+                },
+                "parameters": {
+                    "artifactsLocation": {
+                        "value": "[variables('artifactsLocation')]"
+                    },
+                    "availabilityOption": {
+                        "value": "[variables('availabilityOption')]"
+                    },
+                    "availabilitySetName": {
+                        "value": "[variables('availabilitySetName')]"
+                    },
+                    "availabilityZones": {
+                        "value": "[variables('availabilityZones')]"
+                    },
+                    "vmGalleryImageOffer": {
+                        "value": "[variables('vmGalleryImageOffer')]"
+                    },
+                    "vmGalleryImagePublisher": {
+                        "value": "[variables('vmGalleryImagePublisher')]"
+                    },
+                    "vmGalleryImageHasPlan": {
+                        "value": "[variables('vmGalleryImageHasPlan')]"
+                    },
+                    "vmGalleryImageSKU": {
+                        "value": "[variables('vmGalleryImageSKU')]"
+                    },
+                    "vmGalleryImageVersion": {
+                        "value": "[variables('vmGalleryImageVersion')]"
+                    },
+                    "rdshPrefix": {
+                        "value": "[variables('rdshPrefix')]"
+                    },
+                    "rdshNumberOfInstances": {
+                        "value": "[parameters('vmNumberOfInstances')]"
+                    },
+                    "rdshVMDiskType": {
+                        "value": "[variables('vmDiskType')]"
+                    },
+                    "rdshVmSize": {
+                        "value": "[parameters('vmSize')]"
+                    },
+                    "rdshVmDiskSizeGB": {
+                        "value": "[variables('vmDiskSizeGB')]"
+                    },
+                    "rdshHibernate": {
+                        "value": "[variables('vmHibernate')]"
+                    },
+                    "enableAcceleratedNetworking": {
+                        "value": false
+                    },
+                    "vmAdministratorAccountUsername": {
+                        "value": "[parameters('vmAdministratorAccountUsername')]"
+                    },
+                    "vmAdministratorAccountPassword": {
+                        "value": "[parameters('vmAdministratorAccountPassword')]"
+                    },
+                    "administratorAccountUsername": {
+                        "value": "[parameters('administratorDomainUsername')]"
+                    },
+                    "administratorAccountPassword": {
+                        "value": "[parameters('administratorDomainPassword')]"
+                    },
+                    "subnet-id": {
+                        "value": "[variables('subnet-id')]"
+                    },
+                    "vhds": {
+                        "value": "[variables('vhds')]"
+                    },
+                    "rdshImageSourceId": {
+                        "value": "[variables('vmCustomImageSourceId')]"
+                    },
+                    "location": {
+                        "value": "[parameters('vmLocation')]"
+                    },
+                    "createNetworkSecurityGroup": {
+                        "value": "[variables('createNetworkSecurityGroup')]"
+                    },
+                    "networkSecurityGroupId": {
+                        "value": "[variables('networkSecurityGroupId')]"
+                    },
+                    "networkSecurityGroupRules": {
+                        "value": "[variables('networkSecurityGroupRules')]"
+                    },
+                    "networkInterfaceTags": {
+                        "value": "[variables('networkInterfaceTags')]"
+                    },
+                    "networkSecurityGroupTags": {
+                        "value": "[variables('networkSecurityGroupTags')]"
+                    },
+                    "virtualMachineTags": {
+                        "value": "[variables('virtualMachineTags')]"
+                    },
+                    "imageTags": {
+                        "value": "[variables('imageTags')]"
+                    },
+                    "vmInitialNumber": {
+                        "value": "[parameters('vmInitialNumber')]"
+                    },
+                    "hostpoolResourceGroup": {
+                        "value": "[parameters('hostpoolResourceGroup')]"
+                    },
+                    "hostpoolName": {
+                        "value": "[parameters('hostpoolName')]"
+                    },
+                    "domain": {
+                        "value": "[variables('domain')]"
+                    },
+                    "ouPath": {
+                        "value": "[variables('ouPath')]"
+                    },
+                    "aadJoin": {
+                        "value": "[variables('aadJoin')]"
+                    },
+                    "intune": {
+                        "value": "[variables('intune')]"
+                    },
+                    "bootDiagnostics": {
+                        "value": "[variables('bootDiagnostics')]"
+                    },
+                    "_guidValue": {
+                        "value": "[variables('deploymentId')]"
+                    },
+                    "userAssignedIdentity": {
+                        "value": "[variables('userAssignedIdentity')]"
+                    },
+                    "customConfigurationTemplateUrl": {
+                        "value": "[variables('customConfigurationTemplateUrl')]"
+                    },
+                    "customConfigurationParameterUrl": {
+                        "value": "[variables('customConfigurationParameterUrl')]"
+                    },
+                    "SessionHostConfigurationVersion": {
+                        "value": "[if(contains(variables('systemData'), 'hostpoolUpdate'), variables('systemData').sessionHostConfigurationVersion, '')]"
+                    },
+                    "systemData": {
+                        "value": "[variables('systemData')]"
+                    },
+                    "securityType": {
+                        "value": "[variables('securityType')]"
+                    },
+                    "secureBoot": {
+                        "value": "[variables('secureBoot')]"
+                    },
+                    "vTPM": {
+                        "value": "[variables('vTPM')]"
+                    },
+                    "wvdApiVersion": {
+                        "value": "[parameters('wvdApiVersion')]"
+                    }
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "rdshVmNamesObject": {
+            "value": "[variables('rdshVmNamesOutput')]",
+            "type": "object"
+        }
+    }
+}
