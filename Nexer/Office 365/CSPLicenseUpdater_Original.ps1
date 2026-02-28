@@ -51,7 +51,6 @@ if($PSScriptRoot){
 # Set variable for log folder
 $LogFolderPath  = Join-Path -Path $scriptPath -ChildPath "Logs"
 $LogFilePath    = Join-Path -Path $LogFolderPath -ChildPath "CSPLicenseUpdater_$date.Log"
-$LogFileContent = Get-Content -Path $LogFilePath -ErrorAction SilentlyContinue
 
 # Set variables for report paths
 $ReportsFolderPath = Join-Path -Path $scriptPath -ChildPath "Reports"
@@ -66,7 +65,7 @@ $ReportOnlyFilePath = Join-Path -Path $ReportOnlyFolderPath -ChildPath $ReportOn
 $CustomerFriendlyName   = "Nexer"
 [int32]$AlertThreshold  = 20                            # Alert threshold for license purchase
 $MailFrom               = "$CustomerFriendlyName-CSPLicenseUpdater@rts.se"
-$MailTo                 = @("yoel.abraham@rts.se","oskar.lagerqvist@rts.se")
+$MailTo                 = "support@rts.se"
 $MailServer             = "smtprelay.rts.se"
 
 # Set variables for Azure Service Principal
@@ -212,10 +211,10 @@ function Install-ScriptModules{
                         Install-Module -Name $Module -Force -ErrorAction Stop -Confirm:$false -Scope CurrentUser
                     }catch [System.Exception] {
                         Write-LogEntry -Severity ERROR -Message "An error occurred while attempting to install the module. Error message: $($_.Exception.Message)"
-                        $AlertType = "$Module Module installation"
-                        if ($LogFileContent -notmatch $AlertType) {
+                        $AlertType = "Module installation"
+                        if ((Get-Content $LogFilePath) -match $AlertType) {
                             Write-LogEntry -Severity INFO -Message "Sending $AlertType mail alert."
-                            Send-Alert -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
+                            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
                         }
                         Write-LogEntry -Severity WARNING -Message "Breaking script"
                         Write-LogEntry "################ END ################"
@@ -323,9 +322,9 @@ try {
 catch [System.Exception] {
     Throw "Failed to create log and report folders. Error message: $($_.Exception.Message)"
     $AlertType = "Folder Creation"
-        if ($LogFileContent -notmatch $AlertType) {
+        if ((Get-Content $LogFilePath) -match $AlertType) {
             Throw "Sending $AlertType mail alert."
-            Send-Alert -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
+            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
         }
     Break
 }
@@ -361,9 +360,9 @@ Try{
     }Catch [System.Exception] {
         Write-LogEntry -Severity ERROR -Message "An error occurred while connecting to Microsoft Graph. Error message: $($_.Exception.Message)"
         $AlertType = "MgGraph Authentication"
-        if ($LogFileContent -notmatch $AlertType) {
+        if ((Get-Content $LogFilePath) -match $AlertType) {
             Write-LogEntry -Severity INFO -Message "Sending $AlertType mail alert."
-            Send-Alert -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
+            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
         }
         Write-LogEntry -Severity WARNING -Message "Breaking script"
         Write-LogEntry "################ END ################"
@@ -373,9 +372,9 @@ Try{
 }catch [System.Exception] {
     Write-LogEntry -Severity ERROR -Message "An error occurred while getting local certificate for Microsoft Graph. Error message: $($_.Exception.Message)"
     $AlertType = "Get Certificate"
-        if ($LogFileContent -notmatch $AlertType) {
+        if ((Get-Content $LogFilePath) -match $AlertType) {
             Write-LogEntry -Severity INFO -Message "Sending $AlertType mail alert."
-            Send-Alert -Subject "$CustomerFriendlyName - $AlertType" -Message $_
+            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName - $AlertType" -Message $_
         }
     Write-LogEntry -Severity WARNING -Message "Breaking script"
     Write-LogEntry "################ END ################"
@@ -422,9 +421,9 @@ try {
 catch [System.Exception] {
     Write-LogEntry -Severity ERROR -Message "Failed to gather user information from Microsoft Graph. Error message: $($_.Exception.Message)"
     $AlertType = "Get User and License info from Microsoft Graph"
-        if ($LogFileContent -notmatch $AlertType) {
+        if ((Get-Content $LogFilePath) -match $AlertType) {
             Write-LogEntry -Severity INFO -Message "Sending $AlertType mail alert."
-            Send-Alert -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
+            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
         }
     Write-LogEntry -Message "Breaking script."
     Write-LogEntry "################ END ################"
@@ -449,9 +448,9 @@ $AllLicenses | ForEach-Object {
 
 if ($VerificationError) {
     $AlertType = "SkuId Verification"
-        if ($LogFileContent -notmatch $AlertType) {
+        if ((Get-Content $LogFilePath) -match $AlertType) {
             Write-LogEntry -Severity INFO -Message "Sending $AlertType mail alert."
-            Send-Alert -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
+            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $_
         }
     Write-LogEntry -Message "Breaking script."
     Write-LogEntry "################ END ################"
@@ -647,10 +646,10 @@ if ($ProcessLicenses) {
                                     $UpdateStatus = "SUCCESS"
 
                                     # Email alert for big license change
-                                    if (($License.Difference -ge $AlertThreshold) -OR ($License.Difference -le -$AlertThreshold)) {
-                                        Write-LogEntry -Severity WARNING -Message "The amount of licenses changed has crossed alert threshold, sending email alert."
+                                    if (($License.Difference -ge 20) -OR ($License.Difference -le -20)) {
+                                        Write-LogEntry -Severity WARNING -Message "License change is above threshold, sending email alert."
                                         $AlertType = "Big license change"
-                                        Send-Alert -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message "$($License.Difference) $($License.Name) seats was bought for $CustomerFriendlyName tenant."
+                                        Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message "$($License.Difference) $($License.Name) seats was bought for $CustomerFriendlyName tenant."
                                     }
                                 }
                                 catch [System.Exception] {
@@ -775,9 +774,9 @@ $env:USERDOMAIN\$env:COMPUTERNAME
 "
 
         $AlertType = "License allocation"
-        if ($LogFileContent -notmatch $AlertType) {
+        if ((Get-Content $LogFilePath) -match $AlertType) {
             Write-LogEntry -Severity INFO -Message "Sending $AlertType mail alert."
-            Send-Alert -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $MailBody
+            Send-Alert -SendTo "Yoel.Abraham@rts.se" -Subject "$CustomerFriendlyName-CSPLicenseUpdater - ALERT - $AlertType" -Message $MailBody
         }else {
         Write-LogEntry -Message "All license allocations are correct."
         }

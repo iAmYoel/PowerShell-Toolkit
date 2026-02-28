@@ -427,20 +427,23 @@ $RootFolder = (Get-Item $PSScriptRoot).Parent.FullName
                                                     }
             "Sigma Connectivity Group AB"           { "Connectivity SWE Office $city" }
             "Sigma Connectivity Inc."               { @("og-ConnectivityAll","Connectivity INC Office $city") }
+            "Sigma Connectivity Ltd"                { "Connectivity UK SC LTD Office $city" }
             "Sigma Connectivity Sp. z o.o."         { @("og-ConnectivityAll","Connectivity PL Office $city") }
             "Sigma Connectivity Engineering AB"     { @("og-ConnectivityAll","SC Engineering Office $city") }
             "Sigma Connectivity Medtech AB"         { "Connectivity SWE Office $city" }
             "Sigma Embedded Engineering AB"         { "Embedded Engineering Office $city" }
+            "Sigma Embedded Engineering Fututre AB" { "Embedded Engineering Future Office $city" }
             "Sigma Energy & Marine AB"              { "Energy Marine Office $city" }
             "Sigma Energy & Marine AS"              { "Energy Marine AS Office $city" }
-            "Sigma Industry Development AB"         { "Industry Development Office $city"}
+            "Sigma Industry Development AB"         { "Industry Development Office $city" }
             "Sigma Industry East AB"                { "Industry East Office $city" }
             "Sigma Industry East North AB"          { "Industry East North Office $city" }
             "Sigma Industry Evolution AB"           { "Industry Evolution Office $city" }
             "Sigma Industry Evolve AB"              { "Industry Evolve Office $city"}
             "Sigma Industry Innovation AB"          { "Industry Innovation Office $city" }
-            "Sigma Industry North AB"               { "Industry North Office $city"}
-            "Sigma Industry Smart AB"               { "Industry Smart Office $city"}
+            "Sigma Industry North AB"               { "Industry North Office $city" }
+            "Sigma Industry Power and Energy AB"    { "Industry Power and Energy Office $city" }
+            "Sigma Industry Smart AB"               { "Industry Smart Office $city" }
             "Sigma Industry Solutions AB"           { "Industry Solutions Office $city" }
             "Sigma Industry South AB"               { "Industry South Office $city" }
             "Sigma Industry West AB"                { "Industry West Office $city" }
