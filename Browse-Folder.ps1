@@ -29,3 +29,5 @@ function Browse-Folder {
     $browse.SelectedPath
     $browse.Dispose()
 }
+
+Browse-Folder
